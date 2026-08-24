@@ -5,6 +5,13 @@
 A small, runnable implementation of a typed intermediate layer for geo-analytical
 question answering, by M. Daud Tasleem.
 
+It is the middle of three packages written to work together. Attributes are
+annotated and the annotation agreed on in
+[geo-annotation-kit](https://github.com/daudee215/geo-annotation-kit), which produces the
+typed sources this package consumes; the answers this package's workflows produce are
+put in front of people and scored in
+[geoqa-study-harness](https://github.com/daudee215/geoqa-study-harness).
+
 Python 3.10, standard library only. No numpy, no geopandas, no external packages.
 
 ```
