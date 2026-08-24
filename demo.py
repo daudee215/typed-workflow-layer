@@ -18,8 +18,10 @@ from __future__ import annotations
 
 import ccd
 import provenance
+import ranking
 import request as request_parser
 from ccd import CCDType
+from cost import CostModel, SourceProfile
 from synthesis import Dataset, build_chain, enumerate_workflows, why_rejected
 
 QUESTION = (
@@ -126,6 +128,56 @@ def toy_proportion(covered, districts):
     }
 
 
+# Declared metadata about the sources. Nothing here is inferred, and a source
+# without a profile is not penalised.
+PROFILES = (
+    SourceProfile("noise", resolution_m=10.0, year=2024, authority="RIVM"),
+    SourceProfile("district", year=2023, authority="CBS"),
+)
+
+
+def ranking_section(workflows) -> None:
+    heading(9, "Ranking the {0} that survive".format(len(workflows)))
+    model = CostModel(profiles=PROFILES)
+    scored = ranking.rank(workflows, model)
+
+    print("Cost is read off the same core concept data type axes the checker")
+    print("uses, so it says what a workflow does to the data rather than which")
+    print("one somebody preferred. Cheapest first.")
+    print()
+    for item in scored[:5]:
+        print(" ", item)
+    print("  ...")
+    print(" ", scored[-1])
+    print()
+
+    print("The winner as a plan rather than a nested call:")
+    print(ranking.plan(scored[0].workflow))
+    print()
+
+    print("Why the best beats the worst:")
+    print()
+    print(ranking.explain(scored[0].workflow, scored[-1].workflow, model))
+    print()
+
+    result = ranking.stability(workflows, model)
+    print("Sensitivity. Each weight was doubled and halved in turn, {0}".format(
+        result["variants"]))
+    print("variants in all, and the same workflow won {0} of them.".format(
+        result["held"]))
+    if result["stable"]:
+        print("That makes the winner a claim about the workflows. Had it")
+        print("changed, it would have been a claim about the weights, and")
+        print("stability() is here so that the difference is measurable")
+        print("rather than assumed.")
+    print()
+    print("agreement() scores any ordering against a human one with Kendall's")
+    print("tau, and disagreements() names the pairs where the two part company.")
+    print("Those are the honest outputs: a cost model that cannot be shown to")
+    print("be wrong is not worth having, and no gold standard of analyst")
+    print("preferences has been collected yet, so no tau is reported here.")
+
+
 def main() -> None:
     print("Typed intermediate layer for geo-analytical question answering")
     print("Worked example: noise exposure by district, Amsterdam")
@@ -171,8 +223,8 @@ def main() -> None:
     print()
     print("Type validity is necessary and not sufficient. The workflows the")
     print("constraint removes are well typed; they answer a different")
-    print("question. Ranking what is left is not attempted here, and the")
-    print("counts above are what a depth bound costs and buys.")
+    print("question. The counts above are what a depth bound costs and buys.")
+    print("The 24 that remain are ranked in section 9.")
     print()
     print("The {0} admissible workflows, shortest first:".format(len(workflows)))
     for index, workflow in enumerate(workflows, start=1):
@@ -245,6 +297,8 @@ def main() -> None:
     print("Covered area is extensive: the three figures may be summed.")
     print("The proportions are intensive: summing them would mean nothing.")
     print("That distinction is carried by the types, not by the arithmetic.")
+
+    ranking_section(workflows)
 
 
 if __name__ == "__main__":

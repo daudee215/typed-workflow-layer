@@ -34,6 +34,40 @@ them, and a system that does not separate them will happily sum a column of perc
 reason, and almost everything the package refuses, it refuses on that axis or on the
 core concept axis.
 
+## Ranking
+
+Type checking says a workflow may run. It does not say which of the admissible workflows
+anybody should run. `cost.py` and `ranking.py` answer that, and every term is read off the
+same CCD axes the checker already uses rather than invented alongside them:
+
+- **scale loss**, descent through Stevens' measurement scales, which the quality lattice
+  in `ccd.py` already orders
+- **support loss**, coarsening of the geometry a value is defined over
+- **concept shift**, a change of core concept, which is a modelling decision
+- **length**, as a tiebreaker only
+- **source**, from declared resolution and currency, bounded so it never dominates
+- **redundancy**, computations performed twice
+
+Two claims in there are worth arguing with. The first is **position weighting**: a loss at
+the first step costs more than the same loss at the last, because everything downstream is
+computed from what survived. Constrain then ZonalStatistics and ZonalStatistics then
+Constrain type check identically, and the second is the better workflow because the
+statistics saw the values. Position weighting is the only thing separating them.
+
+The second is that **weights are policy**. They sit in a dataclass with stated defaults,
+`CostModel.with_weights` produces variants, and `ranking.stability` reports how much of
+the ordering survives each weight doubled and halved. On the noise question the winner
+holds across all twelve variants, which makes it a claim about the workflows. Had it
+moved, that would have been a claim about the weights, and the difference is measurable
+rather than asserted.
+
+`ranking.plan` exists because `Workflow.expression` flattens a directed acyclic graph into
+a tree, so a shared intermediate prints once per consumer and the workflow reads as doing
+the work twice. Of the 176 workflows at depth four, 45 share an intermediate and are
+misread this way and 2 genuinely recompute. Those two cases look identical in an
+expression string and are not the same thing, which is why there is both a `sharing`
+report and a `redundancy` cost.
+
 ## What it is not
 
 It is not a GIS. It does not read geodata, does not project anything, and does not
@@ -125,8 +159,15 @@ Read this section before the code.
   English question to the controlled phrasing is done by a human in `demo.py`.
 - **Depth-bounded search.** The demo runs at depth 4. Nothing here says what happens at
   depth 8, and the counts printed in section 4 suggest it grows quickly.
-- **No cost model.** The 24 admissible workflows are returned unranked. Some are sensible
-  and some are absurd, and the package has nothing to say about which is which.
+- **The cost model has no gold standard behind it.** `cost.py` ranks the 24 admissible
+  workflows and `ranking.stability` shows the winner holds across every weight doubled
+  and halved, twelve variants. What has not been done is collecting an ordering from
+  analysts and measuring against it. `ranking.agreement` computes Kendall's tau and
+  `ranking.disagreements` names the flipped pairs, so the check is implemented and
+  unrun. Until it is run, the ranking is a defensible model rather than a validated one.
+- **Cost weights are policy.** The five weights in `cost.Weights` were chosen so that one
+  scale descent early outranks any plausible difference in length. That is an argument,
+  not a measurement, and it is why the sensitivity facility exists.
 - **No support checking between slots.** `Overlay` accepts two fields with different
   supports. That is a real hole and it is left open rather than papered over.
 - **No treatment of Network or Event.** Both terms exist on the concept axis and no
@@ -142,9 +183,10 @@ Read this section before the code.
    a hand written reference at the level of the operation graph.
 2. Replace the componentwise axes with the published CCD ontology, loaded from OWL and
    checked with a reasoner, keeping the current model as a fast pre-filter.
-3. Add ranking over the enumerated set. Cost, data availability and a preference for
-   workflows that consume every named source would remove most of the absurd ones
-   without touching the type layer.
+3. Collect a preference ordering from two or three analysts over the 24, and run
+   `ranking.agreement` against it. If tau is low, `ranking.disagreements` names the pairs
+   to argue about, and each one is either a counterexample or a missing term in the cost
+   model. This is the piece that turns the ranking from defensible into validated.
 4. Replace the controlled phrasing with a question interface that emits a target type
    and a set of constraints rather than emitting code, so that whatever produces it,
    a grammar or a language model, is still checked by the same layer.
@@ -160,8 +202,10 @@ Read this section before the code.
 | `synthesis.py` | enumeration of all valid workflows, and `why_rejected` |
 | `provenance.py` | the conceptual transformation graph, JSON and text tree |
 | `request.py` | three controlled phrasings to a target type plus constraints |
-| `demo.py` | the Amsterdam example, two refusals, and the toy geometry |
-| `tests/` | 78 unittest cases, one file per module, including a run of the demo |
+| `cost.py` | scale, support, concept, length, source and redundancy cost, position weighted |
+| `ranking.py` | ordering, pairwise explanation, plan rendering, Kendall's tau, sensitivity |
+| `demo.py` | the Amsterdam example, two refusals, the toy geometry, and the ranking |
+| `tests/` | 119 unittest cases, one file per module, including a run of the demo |
 
 ## Licence
 
