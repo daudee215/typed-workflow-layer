@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+
+# Local instructions, not part of the package (contains local paths)
+PUSH THIS - read me first.txt
