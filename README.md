@@ -1,5 +1,7 @@
 # typed-workflow-layer
 
+[![tests](https://github.com/daudee215/typed-workflow-layer/actions/workflows/tests.yml/badge.svg)](https://github.com/daudee215/typed-workflow-layer/actions/workflows/tests.yml)
+
 A small, runnable implementation of a typed intermediate layer for geo-analytical
 question answering, by M. Daud Tasleem.
 
