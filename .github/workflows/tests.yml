@@ -1,0 +1,36 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 is the floor the README claims. 3.12 is here so that a
+        # deprecation lands in CI rather than on a reviewer's machine.
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: No dependencies to install
+        run: |
+          echo "Standard library only. If this step ever needs to change,"
+          echo "the README claim that the package has no dependencies is wrong."
+          test ! -f requirements.txt
+
+      - name: Run the test suite
+        run: python -m unittest discover -s tests -v
+
+      - name: Run the demo end to end
+        run: python demo.py > /dev/null
