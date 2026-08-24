@@ -135,10 +135,13 @@ def sharing(workflow) -> dict:
     Worth reporting because Workflow.expression flattens a directed acyclic
     graph into a tree, so a shared intermediate is printed once per consumer
     and the workflow reads as though it does the work twice. Of the 176
-    workflows the noise question produces at depth four, 45 share an
-    intermediate and are misread this way; 2 genuinely recompute, which is what
-    the redundancy term in cost.py charges for. The two cases look identical in
-    an expression string and are not the same thing at all.
+    workflows the noise question produces at depth four, 47 share an
+    intermediate and are misread this way; none of them genuinely recomputes,
+    because the search keeps the shortest realisation of an expression and a
+    workflow computing a subexpression twice is always the longer realisation.
+    The two cases still look identical in an expression string and are still
+    not the same thing, which is why the redundancy term in cost.py stays: it
+    charges chains arriving through build_chain, not enumerated candidates.
     """
     source_names = {source.name for source in workflow.sources}
     consumers = {}

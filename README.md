@@ -19,8 +19,8 @@ python3 demo.py
 python3 -m unittest discover -s tests
 ```
 
-Both run on a clean machine from this directory. The demo prints about two hundred
-lines and takes a second.
+Both run on a clean machine from this directory. The demo prints about 280 lines and
+takes a second.
 
 ## What it is
 
@@ -72,10 +72,16 @@ rather than asserted.
 
 `ranking.plan` exists because `Workflow.expression` flattens a directed acyclic graph into
 a tree, so a shared intermediate prints once per consumer and the workflow reads as doing
-the work twice. Of the 176 workflows at depth four, 45 share an intermediate and are
-misread this way and 2 genuinely recompute. Those two cases look identical in an
-expression string and are not the same thing, which is why there is both a `sharing`
-report and a `redundancy` cost.
+the work twice. Of the 176 workflows at depth four, 47 share an intermediate and are
+misread this way. None of them genuinely recomputes anything: since the search started
+keeping the shortest realisation of an expression, the workflow that computes a shared
+subexpression once is always shorter than the one that computes it twice and always wins
+the key, so the enumerator cannot emit the second kind at all. Reading as redundant and
+being redundant remain different things, which is why there is both a `sharing` report and
+a `redundancy` cost, but the cost is now a check on chains arriving through `build_chain`
+rather than something that separates enumerated candidates. The same fact arrives from the
+cost side under "Whether the ranking is doing any work" below: `redundancy` is one of three
+components that never vary on this scenario, so its weight is inert here at any value.
 
 ## Measuring the search instead of asserting things about it
 
@@ -254,7 +260,7 @@ Read this section before the code.
   analysts and measuring against it. `ranking.agreement` computes Kendall's tau and
   `ranking.disagreements` names the flipped pairs, so the check is implemented and
   unrun. Until it is run, the ranking is a defensible model rather than a validated one.
-- **Cost weights are policy.** The five weights in `cost.Weights` were chosen so that one
+- **Cost weights are policy.** The six weights in `cost.Weights` were chosen so that one
   scale descent early outranks any plausible difference in length. That is an argument,
   not a measurement, and it is why the sensitivity facility exists.
 - **No support checking between slots.** `Overlay` accepts two fields with different
@@ -295,7 +301,7 @@ Read this section before the code.
 | `ranking.py` | ordering, pairwise explanation, plan rendering, Kendall's tau, sensitivity |
 | `demo.py` | the Amsterdam example, two refusals, the toy geometry, and the ranking |
 | `analysis.py` | soundness, growth, ablation, type closure, ranking discrimination |
-| `tests/` | 145 unittest cases, one file per module, including a run of the demo |
+| `tests/` | 147 unittest cases, one file per module, including a run of the demo |
 
 ## Licence
 

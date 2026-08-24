@@ -138,7 +138,18 @@ class TransformationRequest:
 
 
 def parse(phrasing: str) -> TransformationRequest:
-    """Parse one of the phrasings in GRAMMAR, or raise ValueError."""
+    """Parse one of the phrasings in GRAMMAR, or raise ValueError.
+
+    A non-string is refused here rather than at .strip(), so that everything
+    this function turns away arrives as a ValueError carrying the grammar.
+    Refusing everything it does not recognise is the claim the module makes;
+    an AttributeError from the first line is not that claim being honoured.
+    """
+    if not isinstance(phrasing, str):
+        raise ValueError(
+            "expected a phrasing as a string, got {0}. This parser recognises "
+            "only:\n  {1}".format(type(phrasing).__name__, "\n  ".join(GRAMMAR))
+        )
     text = " ".join(phrasing.strip().split())
     if text.endswith("?"):
         text = text[:-1].rstrip()

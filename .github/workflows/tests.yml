@@ -34,3 +34,9 @@ jobs:
 
       - name: Run the demo end to end
         run: python demo.py > /dev/null
+
+      - name: Run the search analysis
+        # Every number in the "Measuring the search" section of the README is
+        # printed by this script, and the README tells the reader to run it.
+        # About 11 seconds.
+        run: python analysis.py > /dev/null

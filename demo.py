@@ -224,7 +224,7 @@ def main() -> None:
     print("Type validity is necessary and not sufficient. The workflows the")
     print("constraint removes are well typed; they answer a different")
     print("question. The counts above are what a depth bound costs and buys.")
-    print("The 24 that remain are ranked in section 9.")
+    print("The {0} that remain are ranked in section 9.".format(len(workflows)))
     print()
     print("The {0} admissible workflows, shortest first:".format(len(workflows)))
     for index, workflow in enumerate(workflows, start=1):

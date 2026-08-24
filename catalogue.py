@@ -244,7 +244,7 @@ def get(name: str) -> Transformation:
             "no transformation named {0!r}. Known: {1}".format(
                 name, ", ".join(sorted(CATALOGUE))
             )
-        )
+        ) from None
 
 
 def producing(required: CCDType, from_type: Optional[CCDType] = None) -> tuple:

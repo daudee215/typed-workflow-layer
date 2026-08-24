@@ -14,8 +14,11 @@ not fine in a suite.
 import unittest
 
 import analysis
+import ranking
 from analysis import SOURCES, TARGET
+from cost import CostModel
 from synthesis import Restrictions, enumerate_workflows
+from tests import subexpressions
 
 
 class TestSoundness(unittest.TestCase):
@@ -137,7 +140,7 @@ class TestRestrictionsAreMeasured(unittest.TestCase):
         for workflow in enumerate_workflows(SOURCES, TARGET, max_depth=4,
                                             max_workflows=100000):
             self.assertEqual(len(workflow.steps),
-                             len(_calls(workflow.expression())),
+                             len(subexpressions(workflow.expression())),
                              workflow.expression())
 
     def test_distinct_slots_only_affects_overlay(self):
@@ -282,30 +285,38 @@ class TestRankingActuallyOrders(unittest.TestCase):
                                "{0} reordered the result".format(row.weight))
 
 
+class TestTheSharingParagraph(unittest.TestCase):
+    """Both figures in the `ranking.plan` paragraph of the README.
+
+    It read 45 and 2 until the deduplication started keeping the shortest
+    realisation of an expression. That change moved both figures and touched
+    neither the README nor ranking.py, so the paragraph justifying why there is
+    a sharing report as well as a redundancy cost went on quoting numbers the
+    code no longer produced. Pinned here for the same reason 176, 5 and 9 are
+    pinned above: a number in prose that nothing checks stops being true
+    quietly.
+    """
+
+    def test_47_of_the_176_share_an_intermediate(self):
+        workflows = enumerate_workflows(SOURCES, TARGET, max_depth=4,
+                                        max_workflows=100000)
+        self.assertEqual(len(workflows), 176)
+        shared = [w for w in workflows if ranking.sharing(w)["count"] > 0]
+        self.assertEqual(len(shared), 47)
+
+    def test_and_none_of_the_176_recomputes(self):
+        """The second half of the same sentence.
+
+        test_cost.py checks the underlying invariant at two depths and states
+        why it holds. This pins the figure the README prints beside the 47,
+        because the two are read as one claim and can go stale together.
+        """
+        workflows = enumerate_workflows(SOURCES, TARGET, max_depth=4,
+                                        max_workflows=100000)
+        model = CostModel()
+        recomputing = [w for w in workflows if model.cost(w).redundancy > 0]
+        self.assertEqual(recomputing, [])
+
+
 if __name__ == "__main__":
     unittest.main()
-
-
-def _calls(expression):
-    """Every distinct non-source call in an expression.
-
-    The minimum number of steps a workflow with that expression can have, so
-    comparing it against len(workflow.steps) detects both a dead step and a
-    subexpression computed twice.
-    """
-    found, depth, start = set(), 0, 0
-    for index, character in enumerate(expression):
-        if character == "(":
-            if depth == 0:
-                start = index
-                while start > 0 and (expression[start - 1].isalnum()
-                                     or expression[start - 1] == "_"):
-                    start -= 1
-            depth += 1
-        elif character == ")":
-            depth -= 1
-            if depth == 0:
-                span = expression[start:index + 1]
-                found.add(span)
-                found |= _calls(span[span.index("(") + 1:-1])
-    return found

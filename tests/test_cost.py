@@ -22,6 +22,7 @@ from cost import (
     _support_loss,
 )
 from synthesis import Dataset, build_chain, enumerate_workflows
+from tests import subexpressions
 
 NOISE = Dataset("noise", CCDType(ccd.FIELD, ccd.INTERVAL, ccd.REGION_SUPPORT))
 DISTRICT = Dataset("district", CCDType(ccd.OBJECT, ccd.NOMINAL, ccd.REGION_SUPPORT))
@@ -195,31 +196,11 @@ class TestRedundancy(unittest.TestCase):
         """
         query = request_parser.parse(QUESTION)
         for workflow in enumerate_workflows(SOURCES, query.target, max_depth=4):
-            minimum = len(_subexpressions(workflow.expression()))
+            minimum = len(subexpressions(workflow.expression()))
             self.assertEqual(
                 len(workflow.steps), minimum,
                 "{0} is stored with {1} steps but needs {2}".format(
                     workflow.expression(), len(workflow.steps), minimum))
-
-
-def _subexpressions(expression):
-    """Every distinct non-source call in an expression, as a set of strings."""
-    found, depth, start = set(), 0, 0
-    for index, character in enumerate(expression):
-        if character == "(":
-            if depth == 0:
-                start = index
-                while start > 0 and (expression[start - 1].isalnum()
-                                     or expression[start - 1] == "_"):
-                    start -= 1
-            depth += 1
-        elif character == ")":
-            depth -= 1
-            if depth == 0:
-                span = expression[start:index + 1]
-                found.add(span)
-                found |= _subexpressions(span[span.index("(") + 1:-1])
-    return found
 
 
 class TestWeights(unittest.TestCase):

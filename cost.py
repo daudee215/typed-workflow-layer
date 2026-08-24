@@ -20,6 +20,9 @@ preference expressed in numbers:
                  than a computation, and worth flagging as such.
   length         number of steps, as a tiebreaker only.
   source         a penalty read from declared metadata about the inputs.
+  redundancy     the same computation performed twice in one workflow. The
+                 enumerator can no longer emit one, so this charges chains
+                 that arrive through build_chain from outside the search.
 
 Two decisions in here are worth arguing with rather than accepting.
 
@@ -37,6 +40,7 @@ that cannot be shown to be wrong is not worth having.
 """
 
 from dataclasses import dataclass, field, replace
+from math import log2
 from typing import Dict, Optional, Sequence
 
 from ccd import (
@@ -126,8 +130,6 @@ class SourceProfile:
         if self.resolution_m is not None and self.resolution_m > 0:
             # Halving resolution costs one unit, so 10 m to 20 m and 20 m to
             # 40 m cost the same, which is how resolution is usually discussed.
-            from math import log2
-
             total += max(0.0, log2(self.resolution_m / 10.0))
         if self.year is not None:
             total += max(0, reference_year - self.year) / 10.0
@@ -249,7 +251,7 @@ def _redundancy(workflow) -> float:
     expressions match, which catches recomputation under different output names
     rather than only literal duplicates.
     """
-    seen = {}
+    seen = set()
     repeats = 0
     for step in workflow.steps:
         signature = (
@@ -259,7 +261,7 @@ def _redundancy(workflow) -> float:
         if signature in seen:
             repeats += 1
         else:
-            seen[signature] = step.output
+            seen.add(signature)
     return float(repeats)
 
 
@@ -282,13 +284,24 @@ def _governing_input(workflow, step) -> Optional[CCDType]:
     carries the most measurement structure, because that is the one whose
     information a lossy step is discarding. Comparing against the coarsest
     input would report no loss for exactly the workflows that lose the most.
+
+    An unresolvable reference is refused rather than skipped. It cannot happen
+    on an enumerated workflow, but build_chain accepts chains from outside the
+    search, and a step whose inputs all failed to resolve used to score zero on
+    scale, support and concept, so a hand-built workflow naming a dataset that
+    does not exist came back as the cheapest thing in the list.
     """
     best = None
     for name in step.inputs:
         try:
             candidate = workflow.dataset(name).type
         except KeyError:
-            continue
+            raise ValueError(
+                "step {0} of this workflow consumes {1!r}, which is neither a "
+                "source nor the output of an earlier step".format(
+                    step.transformation, name
+                )
+            ) from None
         if candidate.quality == ANY_QUALITY:
             continue
         if best is None or QUALITY_DEPTH[candidate.quality] > QUALITY_DEPTH[best.quality]:
