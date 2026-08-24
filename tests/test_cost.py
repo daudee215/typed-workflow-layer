@@ -147,13 +147,79 @@ class TestRedundancy(unittest.TestCase):
             self.assertEqual(_redundancy(workflow), 0.0)
 
     def test_true_recomputation_is_charged(self):
-        query = request_parser.parse(QUESTION)
-        workflows = enumerate_workflows(SOURCES, query.target, max_depth=4)
-        charged = [w for w in workflows if _redundancy(w) > 0]
-        self.assertTrue(
-            charged,
-            "the redundancy term should fire somewhere in the unconstrained space",
+        """The redundancy term still works, on the input it is actually for.
+
+        This used to enumerate and look for a recomputing workflow among the
+        results. That stopped being possible: the enumerator now keeps the
+        shortest realisation of an expression, so it cannot emit one. The
+        term's real domain was always chains arriving from outside, which is
+        what build_chain exists for, and that is what is exercised here.
+        """
+        wasteful = build_chain(
+            (
+                ("Clip", ("noise", "district")),
+                ("Clip", ("noise", "district")),
+                ("Coverage", ("$0", "district")),
+                ("Proportion", ("$2",)),
+            ),
+            SOURCES,
         )
+        self.assertEqual(_redundancy(wasteful), 1.0)
+
+    def test_the_enumerator_never_emits_a_recomputing_workflow(self):
+        """The invariant the deduplication fix bought.
+
+        Two step lists can render to the same expression, one computing a
+        shared subexpression once and one computing it twice. Both are valid
+        and one is a step longer. The search used to keep whichever it reached
+        first, which was the longer one for 2 of the 176 workflows here, and
+        cost.py charges length from len(workflow.steps), so those two were
+        ranked worse for steps they did not need.
+        """
+        query = request_parser.parse(QUESTION)
+        for depth in (3, 4):
+            workflows = enumerate_workflows(SOURCES, query.target,
+                                            max_depth=depth)
+            charged = [w for w in workflows if _redundancy(w) > 0]
+            self.assertEqual(
+                charged, [],
+                "depth {0}: enumerator emitted a workflow that recomputes "
+                "something it already had".format(depth))
+
+    def test_no_stored_workflow_is_longer_than_its_expression_needs(self):
+        """The same invariant, measured structurally rather than through cost.
+
+        A workflow's minimum step count is the number of distinct non-source
+        subexpressions in its expression. Storing more steps than that means a
+        shorter realisation of the same expression exists and was discarded.
+        """
+        query = request_parser.parse(QUESTION)
+        for workflow in enumerate_workflows(SOURCES, query.target, max_depth=4):
+            minimum = len(_subexpressions(workflow.expression()))
+            self.assertEqual(
+                len(workflow.steps), minimum,
+                "{0} is stored with {1} steps but needs {2}".format(
+                    workflow.expression(), len(workflow.steps), minimum))
+
+
+def _subexpressions(expression):
+    """Every distinct non-source call in an expression, as a set of strings."""
+    found, depth, start = set(), 0, 0
+    for index, character in enumerate(expression):
+        if character == "(":
+            if depth == 0:
+                start = index
+                while start > 0 and (expression[start - 1].isalnum()
+                                     or expression[start - 1] == "_"):
+                    start -= 1
+            depth += 1
+        elif character == ")":
+            depth -= 1
+            if depth == 0:
+                span = expression[start:index + 1]
+                found.add(span)
+                found |= _subexpressions(span[span.index("(") + 1:-1])
+    return found
 
 
 class TestWeights(unittest.TestCase):

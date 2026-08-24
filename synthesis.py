@@ -15,15 +15,21 @@ something was refused, in terms a reader can act on, is the half that decides
 whether anyone trusts the refusal.
 
 Design note on the search restrictions. Three restrictions keep the space
-finite and free of workflows that are formally distinct but practically the
-same. They are search heuristics, not claims about geography, and each is
-marked below.
+finite and remove workflows that are, in most cases, formally distinct but
+practically the same. They are search heuristics, not claims about geography,
+and each is marked below.
+
+They are also switchable, because an unmeasured heuristic is an assumption.
+analysis.py turns each one off in turn and reports what it costs. That exercise
+corrected this docstring once already: the no immediate repeat restriction was
+described here as removing noise, and it does not. It also removes multi-level
+aggregation, which is a real workflow. See Restrictions.no_immediate_repeat.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from itertools import permutations
+from itertools import permutations, product
 from typing import Optional, Sequence
 
 import catalogue
@@ -98,6 +104,102 @@ class Workflow:
         return frozenset(step.transformation for step in self.steps)
 
 
+@dataclass(frozen=True)
+class Restrictions:
+    """Which search restrictions are in force.
+
+    All three default to on, which is the behaviour the rest of the package
+    relies on. They exist as flags so analysis.py can price each one instead of
+    the docstring asserting they are free.
+
+    connected
+        Drop a workflow containing a step that does not feed the result.
+
+        Now a no-op, and measurably so. expression() renders only the steps
+        reachable from the result, so a disconnected workflow always collapses
+        onto the expression of its connected core, and that core is itself
+        enumerated. It used to still matter for the stored object, because
+        turning it off left 28 of 176 workflows carrying a step that fed
+        nothing. Keeping the shortest realisation of an expression removed that
+        too: a workflow with a dead step is strictly longer than the same
+        expression without one, so it can no longer win the key.
+
+        Kept as a flag rather than deleted, so the claim stays measurable and
+        is re-checked by the suite instead of resting on this paragraph.
+
+    no_immediate_repeat
+        Never apply a transformation to a dataset it produced itself. This one
+        is not free. It removes Aggregate(Aggregate(x)), and aggregating to
+        districts and then to regions is a real two-level workflow, not noise.
+        It is kept on by default because the same rule removes a much larger
+        number of genuinely degenerate chains, and because the type system
+        here cannot tell the two apart: both have identical input and output
+        types, so nothing in the signature distinguishes a second meaningful
+        grouping from a pointless re-sum. Turning it off is the honest way to
+        see multi-level workflows, and analysis.py reports how many appear.
+
+    distinct_slots
+        Never pass one dataset to two slots of the same transformation. Safe
+        for every entry whose slots take different core concepts. Overlay is
+        the exception, taking two nominal fields, so this rule does exclude
+        Overlay(x, x). That is degenerate on any reasonable reading of overlay,
+        but it is an exclusion on semantic grounds and not on the structural
+        grounds the other cases rest on, so it is named here rather than
+        waved through.
+    """
+
+    connected: bool = True
+    no_immediate_repeat: bool = True
+    distinct_slots: bool = True
+
+
+@dataclass
+class SearchStats:
+    """What the search did, as opposed to what it returned.
+
+    truncated is the field that matters. Before it existed the search stopped
+    at max_workflows and returned a plain list, so a caller could not tell a
+    complete enumeration from a capped one. A result that silently looks
+    complete is the same failure as a load test that cannot see its own queue:
+    the arithmetic is right and the subject is wrong.
+    """
+
+    candidates_examined: int = 0
+    type_checks: int = 0
+    admissible_applications: int = 0
+    workflows_found: int = 0
+    truncated: bool = False
+    max_depth_reached: int = 0
+
+    def __str__(self) -> str:
+        return (
+            "{0} workflow(s) from {1} candidate application(s), "
+            "{2} type check(s){3}".format(
+                self.workflows_found,
+                self.candidates_examined,
+                self.type_checks,
+                ", TRUNCATED at the workflow cap" if self.truncated else "",
+            )
+        )
+
+
+class WorkflowSet(list):
+    """The enumeration result, carrying how it was produced.
+
+    A list subclass so every existing caller keeps working unchanged, while
+    `.stats.truncated` gives the one thing a plain list could never say.
+    """
+
+    def __init__(self, workflows=(), stats: Optional[SearchStats] = None):
+        super().__init__(workflows)
+        self.stats = stats if stats is not None else SearchStats()
+
+    @property
+    def complete(self) -> bool:
+        """True when the whole space up to the depth bound was enumerated."""
+        return not self.stats.truncated
+
+
 def _is_connected(steps: Sequence[Step]) -> bool:
     """True when every step contributes to the last step's output.
 
@@ -120,7 +222,8 @@ def enumerate_workflows(
     max_depth: int = 3,
     must_use: Sequence[str] = (),
     max_workflows: int = 500,
-) -> list:
+    restrictions: Optional[Restrictions] = None,
+) -> WorkflowSet:
     """Every admissible workflow from sources to target, up to max_depth steps.
 
     must_use names transformations that have to appear, which is how a
@@ -129,35 +232,53 @@ def enumerate_workflows(
     thresholds anything, even though such a workflow type checks.
 
     Results are ordered by depth and then by expression, so the output is
-    stable between runs.
+    stable between runs. The return is a list carrying `.stats`, so a caller
+    that needs to know whether the cap was hit can ask instead of guessing.
     """
+    rules = restrictions if restrictions is not None else Restrictions()
     required = frozenset(must_use)
     for name in required:
         catalogue.get(name)
     found = {}
+    stats = SearchStats()
+
+    def combinations(available: tuple, arity: int):
+        """Argument assignments for one transformation.
+
+        permutations draws without replacement, which is the distinct_slots
+        restriction. product draws with replacement, which is what the search
+        looks like without it.
+        """
+        if rules.distinct_slots:
+            return permutations(available, arity)
+        return product(available, repeat=arity)
 
     def expand(available: tuple, steps: tuple) -> None:
         if len(found) >= max_workflows or len(steps) >= max_depth:
             return
+        stats.max_depth_reached = max(stats.max_depth_reached, len(steps))
         for name, transformation in CATALOGUE.items():
-            # Search restriction: distinct datasets across slots. Every
-            # two-slot entry in this catalogue combines things of different
-            # kinds, so a repeated argument is always degenerate here.
-            for assignment in permutations(available, transformation.arity):
+            for assignment in combinations(available, transformation.arity):
                 # Checked here rather than only on entry, because the loop
                 # continues after a nested call returns and would otherwise
                 # add one more workflow per stack frame as it unwinds.
                 if len(found) >= max_workflows:
+                    stats.truncated = True
                     return
+                stats.candidates_examined += 1
                 # Search restriction: a transformation is never applied to a
-                # dataset it produced itself. Aggregate of an aggregate and
-                # buffer of a buffer are the cases this removes, and they
-                # would otherwise fill the depth bound with noise.
-                if any(item.origin == name for item in assignment):
+                # dataset it produced itself. See Restrictions for what this
+                # costs, which is more than the first version of this comment
+                # claimed.
+                if rules.no_immediate_repeat and any(
+                    item.origin == name for item in assignment
+                ):
                     continue
                 types = [item.type for item in assignment]
+                stats.type_checks += 1
                 if transformation.check(types):
                     continue
+                stats.admissible_applications += 1
                 output = Dataset(
                     "step%d" % (len(steps) + 1),
                     transformation.output_type(types),
@@ -173,14 +294,35 @@ def enumerate_workflows(
                 if (
                     target.subsumes(output.type)
                     and required.issubset(s.transformation for s in extended)
-                    and _is_connected(extended)
+                    and (not rules.connected or _is_connected(extended))
                 ):
                     workflow = Workflow(extended, tuple(sources), output)
-                    found.setdefault(workflow.expression(), workflow)
+                    expression = workflow.expression()
+                    # Keep the shortest realisation of an expression, not the
+                    # first one reached.
+                    #
+                    # expression() renders the workflow as a tree while the
+                    # workflow is a DAG, so a step feeding two later steps is
+                    # printed twice. Two different step lists can therefore
+                    # render identically: one that computes a shared
+                    # subexpression once, and one that computes it twice. Both
+                    # are correct and one is a step longer.
+                    #
+                    # setdefault kept whichever the search happened to reach
+                    # first, which was the longer one for 2 of the 176
+                    # workflows in the demo scenario. That is not cosmetic:
+                    # cost.py charges length as len(workflow.steps), so those
+                    # two were ranked worse for steps they did not need.
+                    existing = found.get(expression)
+                    if existing is None or len(extended) < len(existing.steps):
+                        found[expression] = workflow
                 expand(available + (output,), extended)
 
     expand(tuple(sources), ())
-    return sorted(found.values(), key=lambda w: (w.depth, w.expression()))
+    stats.workflows_found = len(found)
+    return WorkflowSet(
+        sorted(found.values(), key=lambda w: (w.depth, w.expression())), stats
+    )
 
 
 @dataclass(frozen=True)

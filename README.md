@@ -77,6 +77,86 @@ misread this way and 2 genuinely recompute. Those two cases look identical in an
 expression string and are not the same thing, which is why there is both a `sharing`
 report and a `redundancy` cost.
 
+## Measuring the search instead of asserting things about it
+
+The three search restrictions in `synthesis.py` each arrived with a comment explaining why
+they were harmless, and a comment is not evidence. `analysis.py` turns each one off, runs
+the search again, and reports what comes back. Run it with `python3 analysis.py`.
+
+It found two defects and retired one restriction.
+
+**The workflow cap truncated silently.** `enumerate_workflows` stopped at `max_workflows`
+and returned a plain list, so a capped result was indistinguishable from a complete one. A
+caller ranking those workflows would have been ranking an arbitrary prefix of the space
+while believing it had all of it. The result is now a list carrying `.stats.truncated`. At
+the depth the demo uses the default cap of 500 is not binding, 176 workflows; one level
+deeper there are 1,259 and it would have been.
+
+**The search kept the wrong realisation of an expression.** `expression()` renders a
+workflow as a tree while the workflow is a DAG, so a step feeding two later steps is
+printed twice. Two different step lists can therefore render identically: one computing a
+shared subexpression once, one computing it twice. Both are correct and one is a step
+longer. The deduplication kept whichever the search reached first, which was the longer one
+for 2 of the 176 workflows, and `cost.py` charges length from `len(workflow.steps)`, so
+those two were ranked worse for steps they did not need. It now keeps the shortest.
+
+That fix then made the `connected` restriction obsolete. A workflow carrying a step that
+feeds nothing is strictly longer than the same expression without it, so it can no longer
+win the key. `connected` is now provably a no-op on both the expression set and the stored
+objects, and is kept as a flag only so the suite keeps checking that.
+
+### What the search actually costs
+
+| depth | candidates | type checks | workflows | seconds |
+| --- | --- | --- | --- | --- |
+| 1 | 20 | 20 | 1 | 0.000 |
+| 2 | 272 | 257 | 5 | 0.001 |
+| 3 | 4,736 | 4,258 | 28 | 0.012 |
+| 4 | 111,876 | 96,802 | 176 | 0.271 |
+| 5 | 3,456,516 | 2,902,739 | 1,259 | 8.248 |
+
+The growth factor is not constant, it rises: 13.6, 17.4, 23.6, 30.9. Each step adds a
+dataset to the pool and two-slot transformations draw ordered pairs from it, so the
+branching grows with depth rather than staying fixed. Depth 5 is about the practical
+ceiling on one core.
+
+### Why a depth bound is defensible
+
+The type closure saturates after one round. Five core concept data types are reachable from
+these two sources and nothing new appears after that, while the workflow count is still
+multiplying by thirty per level. Almost everything a deeper search finds is another route
+to a type that was already reachable.
+
+That is the argument for bounding depth, and it is also the argument for having a cost
+model at all: past the fixpoint the search stops adding capability and starts adding
+alternatives, so something has to order them.
+
+Of the ten catalogue entries, nine appear in some workflow reaching this target.
+`Interpolate` never does, because it needs point support and the noise source is region
+support. That is a fact about this question, not a fault in the catalogue.
+
+### Whether the ranking is doing any work
+
+Reported rather than hidden. The 176 workflows collapse into 32 distinct scores, the
+largest tie group holds 22, and rank 1 is a two-way tie. A rank of 1 drawn from a tie is
+not a winner, and the analysis says so instead of printing a leaderboard.
+
+Three of the six cost components never vary across this scenario at all: `support_loss`,
+`source` and `redundancy`. Their weights are inert here at any value, so the order is
+decided by the three that do vary, and tuning one of the inert three to fix a ranking would
+be wasted effort. `redundancy` is inert for a specific reason: the enumerator can no longer
+emit a workflow that recomputes anything, so the term is zero on every candidate. It still
+earns its place, because `build_chain` accepts chains from outside the search and those are
+where recomputation arrives.
+
+Perturbing each weight by 25 per cent on its own leaves the top workflow unchanged in all
+12 trials, the top-five set unchanged in 10, and Kendall's tau against the unperturbed
+order between 0.962 and 1.000. The first of those three numbers alone would have been
+misleading, because ties are broken on the expression string and an unchanged top can mean
+the tie-break did not move rather than the model did not. The three inert components give
+tau of exactly 1.000, which is the component-variance measurement and the perturbation
+measurement agreeing independently.
+
 ## What it is not
 
 It is not a GIS. It does not read geodata, does not project anything, and does not
@@ -214,7 +294,8 @@ Read this section before the code.
 | `cost.py` | scale, support, concept, length, source and redundancy cost, position weighted |
 | `ranking.py` | ordering, pairwise explanation, plan rendering, Kendall's tau, sensitivity |
 | `demo.py` | the Amsterdam example, two refusals, the toy geometry, and the ranking |
-| `tests/` | 119 unittest cases, one file per module, including a run of the demo |
+| `analysis.py` | soundness, growth, ablation, type closure, ranking discrimination |
+| `tests/` | 145 unittest cases, one file per module, including a run of the demo |
 
 ## Licence
 
