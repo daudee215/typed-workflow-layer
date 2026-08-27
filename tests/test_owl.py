@@ -2,7 +2,7 @@
 
 Two kinds of test here. The first kind exercises the Turtle subset directly on
 small inputs, including the malformed ones the reader has to refuse. The second
-kind parses the real `ontology/ccd.ttl` with rdflib and asserts that the
+kind parses the real `typed_workflow_layer/ontology/ccd.ttl` with rdflib and asserts that the
 dependency-free reader produced exactly the same set of triples. That second
 test is the one that matters: a hand-written parser agreeing with itself proves
 nothing, and the whole reason the lattice moved into OWL is that a reasoner can
@@ -11,6 +11,7 @@ read it too.
 
 import os
 import unittest
+from importlib.resources import files
 
 import ccd
 import owl
@@ -166,6 +167,11 @@ class TheShippedOntology(unittest.TestCase):
 
     def test_the_ontology_ships_inside_the_package(self):
         self.assertTrue(os.path.exists(owl.ONTOLOGY_PATH))
+        packaged = files("typed_workflow_layer").joinpath(
+            "ontology", "ccd.ttl")
+        self.assertTrue(packaged.is_file())
+        self.assertEqual(os.path.abspath(owl.ONTOLOGY_PATH),
+                         os.path.abspath(os.fspath(packaged)))
 
 
 class AgainstRdflib(unittest.TestCase):

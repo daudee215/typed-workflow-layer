@@ -14,7 +14,7 @@ put in front of people and scored in
 
 Python 3.10, standard library only. No numpy, no geopandas, no external packages.
 
-The type lattice is an OWL ontology, `ontology/ccd.ttl`. `owl.py` reads it at import
+The type lattice is an OWL ontology, `typed_workflow_layer/ontology/ccd.ttl`. `owl.py` reads it at import
 and `ccd.py` builds the subsumption relation from its rdfs:subClassOf axioms, so the
 hierarchy is data a reasoner can read rather than a dict only this package understands.
 The reader is a few hundred lines of standard library covering the Turtle subset the
@@ -182,7 +182,7 @@ It is not a question answering system. `request.py` recognises three fixed phras
 raises on everything else. There is no natural language step anywhere, and the demo says
 so at the point where a human transcribes the question by hand.
 
-It is not the published CCD ontology. `ontology/ccd.ttl` is an OWL ontology written for
+It is not the published CCD ontology. `typed_workflow_layer/ontology/ccd.ttl` is an OWL ontology written for
 this package: seventeen classes over three axes, with the modelling arguments carried as
 rdfs:comment next to the axiom each one justifies. It approximates the part of the
 published ontology that does the work described below.
@@ -306,7 +306,7 @@ Read this section before the code.
 
 | file | what it holds |
 | --- | --- |
-| `ontology/ccd.ttl` | the type lattice as OWL: seventeen classes, three axes, annotated |
+| `typed_workflow_layer/ontology/ccd.ttl` | the type lattice as OWL: seventeen classes, three axes, annotated |
 | `owl.py` | a dependency-free Turtle reader, and the subsumption relation it builds |
 | `ccd.py` | the three axes, subsumption, unification, and the mismatch report |
 | `catalogue.py` | ten typed transformations and the repair suggestion facility |

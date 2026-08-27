@@ -1,6 +1,6 @@
 """Reading the core concept ontology from OWL, with no dependencies.
 
-`ontology/ccd.ttl` is the authority for the type lattice. This module reads it
+`typed_workflow_layer/ontology/ccd.ttl` is the authority for the type lattice. This module reads it
 and hands `ccd.py` a subsumption relation. The point is that the hierarchy is
 data a reasoner can also read, rather than a Python dict that only this package
 understands.
@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import os
 import re
+from importlib.resources import files
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -37,8 +38,9 @@ RDFS_LABEL = RDFS + "label"
 RDFS_COMMENT = RDFS + "comment"
 OWL_CLASS = OWL + "Class"
 
-ONTOLOGY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                             "ontology", "ccd.ttl")
+_ONTOLOGY_RESOURCE = files("typed_workflow_layer").joinpath(
+    "ontology", "ccd.ttl")
+ONTOLOGY_PATH = os.fspath(_ONTOLOGY_RESOURCE)
 
 _TOKEN = re.compile(
     r"""

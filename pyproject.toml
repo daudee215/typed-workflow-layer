@@ -30,6 +30,7 @@ Related = "https://github.com/daudee215/geo-annotation-kit"
 
 [tool.setuptools]
 py-modules = ["ccd", "owl", "catalogue", "synthesis", "provenance", "request", "cost", "ranking", "analysis", "demo"]
+packages = ["typed_workflow_layer"]
 
 [tool.setuptools.package-data]
-"*" = ["ontology/*.ttl"]
+typed_workflow_layer = ["ontology/*.ttl"]
