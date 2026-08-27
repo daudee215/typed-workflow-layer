@@ -235,6 +235,13 @@ def enumerate_workflows(
     stable between runs. The return is a list carrying `.stats`, so a caller
     that needs to know whether the cap was hit can ask instead of guessing.
     """
+    if max_depth < 0:
+        raise ValueError("max_depth cannot be negative")
+    if max_workflows < 0:
+        raise ValueError("max_workflows cannot be negative")
+    source_names = [source.name for source in sources]
+    if len(source_names) != len(set(source_names)):
+        raise ValueError("source names must be unique")
     rules = restrictions if restrictions is not None else Restrictions()
     required = frozenset(must_use)
     for name in required:
@@ -329,8 +336,8 @@ def enumerate_workflows(
 class Rejection:
     """Why one step of a candidate chain could not be built.
 
-    kind is one of unknown_transformation, arity, unknown_input, type or
-    cross_slot. The type and cross_slot cases carry structured detail.
+    kind is one of unknown_transformation, arity, unknown_input, malformed_step,
+    type or cross_slot. The type and cross_slot cases carry structured detail.
     """
 
     step_index: int
@@ -406,10 +413,32 @@ def why_rejected(chain: Sequence, sources: Sequence[Dataset]) -> Optional[Reject
     Returns None when the whole chain type checks, which is the only way this
     package ever says yes to a chain it did not build itself.
     """
-    known = {source.name: source for source in sources}
+    if not isinstance(chain, Sequence) or isinstance(chain, (str, bytes)):
+        raise ValueError("chain must be a sequence of workflow steps")
+    known = {}
+    for source in sources:
+        if source.name in known:
+            raise ValueError("source names must be unique")
+        known[source.name] = source
     produced = []
 
-    for index, (name, references) in enumerate(chain):
+    for index, item in enumerate(chain):
+        if (not isinstance(item, (tuple, list)) or len(item) != 2):
+            return Rejection(
+                index,
+                "<malformed>",
+                "malformed_step",
+                "each step must be (transformation name, input references)",
+            )
+        name, references = item
+        if (not isinstance(name, str) or not isinstance(references, Sequence)
+                or isinstance(references, (str, bytes))):
+            return Rejection(
+                index,
+                str(name),
+                "malformed_step",
+                "each step must be (transformation name, input references)",
+            )
         try:
             transformation = catalogue.get(name)
         except KeyError as error:
@@ -417,6 +446,15 @@ def why_rejected(chain: Sequence, sources: Sequence[Dataset]) -> Optional[Reject
 
         arguments = []
         for reference in references:
+            if not isinstance(reference, str):
+                return Rejection(
+                    index,
+                    name,
+                    "unknown_input",
+                    "input references must be strings, got {0!r}".format(
+                        reference
+                    ),
+                )
             if reference.startswith("$"):
                 suffix = reference[1:]
                 if not suffix.isdigit():
@@ -501,6 +539,8 @@ def build_chain(chain: Sequence, sources: Sequence[Dataset]) -> Workflow:
     Kept separate from why_rejected so that construction has one entry point
     that cannot succeed on a chain the checker would refuse.
     """
+    if not chain:
+        raise ValueError("a workflow chain must contain at least one step")
     rejection = why_rejected(chain, sources)
     if rejection is not None:
         raise TypeError(rejection.explain())

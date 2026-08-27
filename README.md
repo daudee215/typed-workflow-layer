@@ -99,13 +99,17 @@ components that never vary on this scenario, so its weight is inert here at any 
 ## Execution, provenance and correctness
 
 `executor.py` is the runtime seam. `RuntimeDataset` keeps the declared CCD
-type beside each payload, `execute()` validates those types before running any
-backend operation, and `ExecutionResult.records` records every input, output,
-type and parameter used. The bundled `RectangularBackend` implements
+type beside each payload, `validate_workflow()` checks the workflow structure
+and inferred types before any backend call, and `ExecutionResult.records`
+records every input, output, type and parameter used. The bundled
+`RectangularBackend` implements
 `Constrain`, `Clip`, `Coverage`, `ZonalStatistics`, `Aggregate`, `Proportion`,
 `Reclassify`, `Buffer` and `Overlay` over validated axis-aligned rectangles.
 Unsupported operations fail explicitly instead of silently producing a fake
-answer.
+answer. `ExecutionResult.fingerprint` provides a deterministic SHA-256 digest
+of the runtime trace and output, so repeated runs can be checked or cached.
+Coverage also computes rectangle union area, avoiding double-counting when
+input contours overlap.
 
 The backend is deliberately replaceable. A production adapter can implement
 the same `Backend.run()` contract for GeoPandas, PostGIS, GDAL or QGIS while

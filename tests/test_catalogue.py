@@ -81,6 +81,11 @@ class TestSignatures(unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertIn("must agree on support", str(failures[0]))
 
+    def test_direct_check_reports_wrong_arity_clearly(self):
+        with self.assertRaises(ValueError) as caught:
+            catalogue.get("Coverage").check([FIELD_NOMINAL_REGION])
+        self.assertIn("expects 2 input(s)", str(caught.exception))
+
 
 class TestRepairSuggestions(unittest.TestCase):
     def test_only_coverage_reaches_an_object_from_a_nominal_field(self):

@@ -160,6 +160,14 @@ class TestRefusal(unittest.TestCase):
         self.assertEqual(rejection.kind, "unknown_input")
         self.assertIn("non-negative step index", rejection.explain())
 
+    def test_a_malformed_step_shape_is_reported(self):
+        rejection = why_rejected((("Constrain",),), SOURCES)
+        self.assertEqual(rejection.kind, "malformed_step")
+
+    def test_a_string_is_not_treated_as_a_chain_of_steps(self):
+        with self.assertRaises(ValueError):
+            why_rejected("Constrain", SOURCES)
+
     def test_overlay_reports_a_cross_slot_support_failure(self):
         point_field = Dataset(
             "points", CCDType(ccd.FIELD, ccd.NOMINAL, ccd.POINT_SUPPORT)
@@ -170,6 +178,16 @@ class TestRefusal(unittest.TestCase):
         )
         self.assertEqual(rejection.kind, "cross_slot")
         self.assertIn("must agree on support", rejection.explain())
+
+    def test_an_empty_chain_cannot_become_a_workflow(self):
+        with self.assertRaises(ValueError):
+            build_chain((), SOURCES)
+
+    def test_negative_search_limits_are_refused(self):
+        with self.assertRaises(ValueError):
+            enumerate_workflows(SOURCES, CCDType(ccd.OBJECT), max_depth=-1)
+        with self.assertRaises(ValueError):
+            enumerate_workflows(SOURCES, CCDType(ccd.OBJECT), max_workflows=-1)
 
     def test_an_unknown_transformation_is_reported(self):
         rejection = why_rejected((("Kriging", ("noise",)),), SOURCES)

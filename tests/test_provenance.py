@@ -108,6 +108,23 @@ class TestSerialisation(unittest.TestCase):
         self.assertIn("prov:used", turtle)
         self.assertIn('"Constrain"', turtle)
 
+    def test_prov_export_is_deterministic(self):
+        graph = build_graph()
+        self.assertEqual(graph.to_prov_turtle(), graph.to_prov_turtle())
+        self.assertEqual(graph.to_prov_json(), graph.to_prov_json())
+
+    def test_a_graph_with_a_missing_result_is_refused(self):
+        payload = build_graph().to_dict()
+        payload["result"] = "missing"
+        with self.assertRaises(ValueError):
+            provenance.ConceptualTransformationGraph.from_dict(payload)
+
+    def test_a_graph_with_an_unknown_edge_input_is_refused(self):
+        payload = build_graph().to_dict()
+        payload["edges"][0]["inputs"] = ["missing"]
+        with self.assertRaises(ValueError):
+            provenance.ConceptualTransformationGraph.from_dict(payload)
+
 
 if __name__ == "__main__":
     unittest.main()

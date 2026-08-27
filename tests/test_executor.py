@@ -6,9 +6,11 @@ import ccd
 from executor import (
     ExecutionError,
     RuntimeDataset,
+    validate_workflow,
     execute,
+    union_area,
 )
-from synthesis import Dataset, build_chain
+from synthesis import Dataset, Step, Workflow, build_chain
 
 
 NOISE = Dataset("noise", ccd.CCDType(ccd.FIELD, ccd.INTERVAL, ccd.REGION_SUPPORT))
@@ -49,6 +51,55 @@ def runtime_sources():
 
 
 class TestExecution(unittest.TestCase):
+    def test_valid_workflow_passes_the_execution_boundary_validator(self):
+        validate_workflow(workflow())
+
+    def test_forged_output_type_is_refused_before_backend_execution(self):
+        valid = workflow()
+        forged = Workflow(
+            valid.steps[:-1] + (Step(
+                "Proportion", ("step2",), "step3",
+                ccd.CCDType(ccd.OBJECT, ccd.EXTENSIVE, ccd.REGION_SUPPORT),
+            ),),
+            valid.sources,
+            Dataset("step3", ccd.CCDType(ccd.OBJECT, ccd.EXTENSIVE, ccd.REGION_SUPPORT), "Proportion"),
+        )
+        with self.assertRaises(ExecutionError) as caught:
+            execute(forged, runtime_sources())
+        self.assertIn("does not match inferred type", str(caught.exception))
+
+    def test_dangling_workflow_reference_is_refused_before_backend_execution(self):
+        valid = workflow()
+        forged = Workflow(
+            (Step("Constrain", ("missing",), "step1", valid.steps[0].output_type),),
+            valid.sources,
+            Dataset("step1", valid.steps[0].output_type, "Constrain"),
+        )
+        with self.assertRaises(ExecutionError) as caught:
+            execute(forged, runtime_sources())
+        self.assertIn("is not available", str(caught.exception))
+
+    def test_overlapping_rectangles_are_counted_once(self):
+        self.assertEqual(
+            union_area(((0, 0, 10, 10), (5, 0, 15, 10))), 150.0
+        )
+
+    def test_coverage_does_not_double_count_overlapping_contours(self):
+        coverage = build_chain(
+            (("Coverage", ("noise", "district")),), SOURCES
+        )
+        supplied = {
+            "noise": RuntimeDataset(
+                "noise", NOISE.type,
+                (((0, 0, 10, 10), 75), ((5, 0, 15, 10), 80)),
+            ),
+            "district": RuntimeDataset(
+                "district", DISTRICT.type, (("zone", (0, 0, 20, 10)),)
+            ),
+        }
+        result = execute(coverage, supplied)
+        self.assertEqual(result.value[0].value, 150.0)
+
     def test_intended_workflow_executes_and_returns_expected_shares(self):
         result = execute(
             workflow(), runtime_sources(),
@@ -72,6 +123,29 @@ class TestExecution(unittest.TestCase):
         payload = result.to_dict()
         self.assertEqual(payload["records"][0]["parameters"]["operator"], "'>='")
         self.assertEqual(payload["records"][1]["inputs"], ["step1", "district"])
+
+    def test_same_run_has_a_stable_fingerprint(self):
+        first = execute(
+            workflow(), runtime_sources(),
+            parameters={"step1": {"operator": ">=", "value": 70}},
+        )
+        second = execute(
+            workflow(), runtime_sources(),
+            parameters={"step1": {"operator": ">=", "value": 70}},
+        )
+        self.assertEqual(first.fingerprint, second.fingerprint)
+        self.assertEqual(len(first.fingerprint), 64)
+
+    def test_changed_parameters_change_the_fingerprint(self):
+        first = execute(
+            workflow(), runtime_sources(),
+            parameters={"step1": {"operator": ">=", "value": 70}},
+        )
+        second = execute(
+            workflow(), runtime_sources(),
+            parameters={"step1": {"operator": ">=", "value": 75}},
+        )
+        self.assertNotEqual(first.fingerprint, second.fingerprint)
 
     def test_missing_transformation_parameters_fail_at_the_right_step(self):
         with self.assertRaises(ExecutionError) as caught:
@@ -99,6 +173,43 @@ class TestExecution(unittest.TestCase):
                 workflow(), supplied,
                 parameters={"step1": {"operator": ">=", "value": 70}},
             )
+
+    def test_non_finite_geometry_is_refused(self):
+        supplied = runtime_sources()
+        supplied["district"] = RuntimeDataset(
+            "district", DISTRICT.type, (("bad", (0, 0, float("nan"), 1)),)
+        )
+        with self.assertRaises(ExecutionError) as caught:
+            execute(
+                workflow(), supplied,
+                parameters={"step1": {"operator": ">=", "value": 70}},
+            )
+        self.assertIn("finite", str(caught.exception))
+
+    def test_duplicate_object_names_are_refused(self):
+        supplied = runtime_sources()
+        supplied["district"] = RuntimeDataset(
+            "district", DISTRICT.type,
+            (("same", (0, 0, 10, 10)), ("same", (10, 0, 20, 10))),
+        )
+        with self.assertRaises(ExecutionError) as caught:
+            execute(
+                workflow(), supplied,
+                parameters={"step1": {"operator": ">=", "value": 70}},
+            )
+        self.assertIn("duplicate object names", str(caught.exception))
+
+    def test_mapping_key_and_runtime_name_must_agree(self):
+        supplied = runtime_sources()
+        supplied["noise"] = RuntimeDataset("other", NOISE.type, CONTOURS)
+        with self.assertRaises(ExecutionError) as caught:
+            execute(workflow(), supplied)
+        self.assertIn("disagrees with its name", str(caught.exception))
+
+    def test_parameter_values_must_be_mappings(self):
+        with self.assertRaises(ExecutionError) as caught:
+            execute(workflow(), runtime_sources(), parameters={"step1": 70})
+        self.assertIn("must be a mapping", str(caught.exception))
 
 
 if __name__ == "__main__":

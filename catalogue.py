@@ -78,6 +78,14 @@ class Transformation:
     inherit_support_from: Optional[int] = None
     same_support_slots: tuple = ()
 
+    def __post_init__(self) -> None:
+        for slots in self.same_support_slots:
+            if len(slots) < 2 or len(set(slots)) != len(slots):
+                raise ValueError("cross-slot constraints need distinct slots")
+            if any(not isinstance(index, int) or index < 0 or index >= self.arity
+                   for index in slots):
+                raise ValueError("cross-slot constraint refers to an invalid slot")
+
     @property
     def arity(self) -> int:
         return len(self.inputs)
@@ -88,6 +96,12 @@ class Transformation:
         An empty result means the application is admissible. Arity is the
         caller's problem and is checked before this is reached.
         """
+        if len(actual) != self.arity:
+            raise ValueError(
+                "{0} expects {1} input(s), {2} given".format(
+                    self.name, self.arity, len(actual)
+                )
+            )
         found = []
         for index, (required, given) in enumerate(zip(self.inputs, actual)):
             axis_mismatches = required.mismatches(given)
@@ -96,8 +110,6 @@ class Transformation:
                     SlotMismatch(index, required, given, axis_mismatches)
                 )
         for slots in self.same_support_slots:
-            if len(slots) < 2:
-                raise ValueError("a cross-slot constraint needs two slots")
             supports = tuple(actual[index].support for index in slots)
             if len(set(supports)) > 1:
                 found.append(CrossSlotMismatch(slots, "support", supports))

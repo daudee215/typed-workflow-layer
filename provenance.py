@@ -91,6 +91,29 @@ class ConceptualTransformationGraph:
     result: str
     question: str = ""
 
+    def __post_init__(self) -> None:
+        node_ids = [node.id for node in self.nodes]
+        if len(node_ids) != len(set(node_ids)):
+            raise ValueError("provenance node ids must be unique")
+        known = set(node_ids)
+        source_ids = {node.id for node in self.nodes if node.kind == "source"}
+        if any(node.kind not in ("source", "derived") for node in self.nodes):
+            raise ValueError("provenance node kind must be source or derived")
+        if set(self.sources_consumed) != source_ids:
+            raise ValueError(
+                "sources_consumed must list exactly the graph's source nodes"
+            )
+        if self.result not in known:
+            raise ValueError("provenance result must reference a known node")
+        outputs = [edge.output for edge in self.edges]
+        if len(outputs) != len(set(outputs)):
+            raise ValueError("each provenance node may have only one producer")
+        for edge in self.edges:
+            if edge.output not in known:
+                raise ValueError("edge output {0!r} is not a known node".format(edge.output))
+            if any(item not in known for item in edge.inputs):
+                raise ValueError("edge input references an unknown node")
+
     def node(self, node_id: str) -> Node:
         for candidate in self.nodes:
             if candidate.id == node_id:
@@ -213,6 +236,8 @@ class ConceptualTransformationGraph:
 
     @staticmethod
     def from_dict(payload: dict) -> "ConceptualTransformationGraph":
+        if not isinstance(payload, dict):
+            raise ValueError("provenance payload must be a dictionary")
         if payload.get("format") != FORMAT_VERSION:
             raise ValueError(
                 "unsupported graph format: {0!r}".format(payload.get("format"))
