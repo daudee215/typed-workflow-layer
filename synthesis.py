@@ -33,7 +33,7 @@ from itertools import permutations, product
 from typing import Optional, Sequence
 
 import catalogue
-from catalogue import CATALOGUE, SlotMismatch
+from catalogue import CATALOGUE, CrossSlotMismatch, SlotMismatch
 from ccd import CCDType
 
 
@@ -329,8 +329,8 @@ def enumerate_workflows(
 class Rejection:
     """Why one step of a candidate chain could not be built.
 
-    kind is one of unknown_transformation, arity, unknown_input or type. Only
-    the last carries slot and axis detail.
+    kind is one of unknown_transformation, arity, unknown_input, type or
+    cross_slot. The type and cross_slot cases carry structured detail.
     """
 
     step_index: int
@@ -342,6 +342,7 @@ class Rejection:
     actual: Optional[CCDType] = None
     actual_dataset: Optional[str] = None
     axis_mismatches: tuple = ()
+    cross_slot_mismatches: tuple = ()
 
     def explain(self) -> str:
         """A readable account of the failure, and of what would repair it."""
@@ -417,7 +418,17 @@ def why_rejected(chain: Sequence, sources: Sequence[Dataset]) -> Optional[Reject
         arguments = []
         for reference in references:
             if reference.startswith("$"):
-                position = int(reference[1:])
+                suffix = reference[1:]
+                if not suffix.isdigit():
+                    return Rejection(
+                        index,
+                        name,
+                        "unknown_input",
+                        "reference {0} is not a non-negative step index".format(
+                            reference
+                        ),
+                    )
+                position = int(suffix)
                 if position >= len(produced):
                     return Rejection(
                         index,
@@ -452,18 +463,28 @@ def why_rejected(chain: Sequence, sources: Sequence[Dataset]) -> Optional[Reject
         types = [argument.type for argument in arguments]
         failures = transformation.check(types)
         if failures:
-            first: SlotMismatch = failures[0]
-            return Rejection(
-                index,
-                name,
-                "type",
-                "slot {0} does not unify".format(first.slot),
-                slot=first.slot,
-                required=first.required,
-                actual=first.actual,
-                actual_dataset=_describe(arguments[first.slot]),
-                axis_mismatches=first.axis_mismatches,
-            )
+            first = failures[0]
+            if isinstance(first, SlotMismatch):
+                return Rejection(
+                    index,
+                    name,
+                    "type",
+                    "slot {0} does not unify".format(first.slot),
+                    slot=first.slot,
+                    required=first.required,
+                    actual=first.actual,
+                    actual_dataset=_describe(arguments[first.slot]),
+                    axis_mismatches=first.axis_mismatches,
+                )
+            if isinstance(first, CrossSlotMismatch):
+                return Rejection(
+                    index,
+                    name,
+                    "cross_slot",
+                    str(first),
+                    cross_slot_mismatches=(first,),
+                )
+            raise TypeError("catalogue returned an unknown mismatch type")
 
         produced.append(
             Dataset(

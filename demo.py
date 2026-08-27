@@ -10,13 +10,16 @@ graph. Two chains are then offered to the type checker and refused.
 The geometry at the bottom of this file is toy: axis aligned integer
 rectangles, intersected with plain arithmetic. It is here so that the last
 section prints numbers that came from somewhere rather than from nowhere. The
-library itself contains no executor and no geometry, on purpose. What is being
-demonstrated is the typing.
+workflow is executed through the dependency-free rectangular backend and
+checked against a reference; that backend is not a substitute for a
+CRS-aware GIS adapter.
 """
 
 from __future__ import annotations
 
 import ccd
+from evaluation import compare
+from executor import RuntimeDataset, execute
 import provenance
 import ranking
 import request as request_parser
@@ -29,9 +32,9 @@ QUESTION = (
     "for each district in Amsterdam?"
 )
 
-# Transcribed by hand. There is no natural language step in this package, and
-# this line is where a real system would need a controlled natural language or
-# a question interface that emits a target type rather than code.
+# The controlled form remains useful for reproducible experiments. The small
+# English surface in request.py can also map QUESTION to this same request,
+# without generating executable code.
 CONTROLLED_PHRASING = "proportion of area where noise >= 70 dB for each district"
 
 SOURCES = (
@@ -186,8 +189,8 @@ def main() -> None:
     print("asked:      " + QUESTION)
     print("controlled: " + CONTROLLED_PHRASING)
     print()
-    print("The transcription is manual. This package has no natural language")
-    print("component. request.py accepts these phrasings and nothing else:")
+    print("The controlled form is explicit. request.py also accepts a small")
+    print("English surface and maps it to the same typed request:")
     for line in request_parser.GRAMMAR:
         print("  " + line)
 
@@ -198,6 +201,10 @@ def main() -> None:
     heading(3, "The transformation request")
     query = request_parser.parse(CONTROLLED_PHRASING)
     print(query.describe())
+    english_query = request_parser.parse_question(QUESTION)
+    print("English surface agrees with controlled form: {0}".format(
+        english_query == query
+    ))
 
     heading(4, "Every admissible workflow, to a depth of {0}".format(MAX_DEPTH))
     print("target: " + str(query.target))
@@ -280,11 +287,33 @@ def main() -> None:
 
     heading(8, "The same workflow run over the toy geometry")
     constraint = query.constraints[0]
+    runtime = execute(
+        workflow,
+        {
+            "noise": RuntimeDataset("noise", SOURCES[0].type, NOISE_CONTOURS),
+            "district": RuntimeDataset("district", SOURCES[1].type, DISTRICTS),
+        },
+        parameters={
+            "step1": {
+                "operator": constraint.operator,
+                "value": constraint.value,
+            }
+        },
+    )
+    shares = {item.object_name: item.value for item in runtime.value}
     kept = toy_constrain(NOISE_CONTOURS, constraint.operator, constraint.value)
     covered = toy_coverage(kept, DISTRICTS)
-    shares = toy_proportion(covered, DISTRICTS)
+    report = compare(
+        {"Centrum": 0.30, "Zuid": 0.40, "Noord": 0.18}, shares
+    )
     print("These values come from the rectangles at the top of this file.")
     print("They describe the toy input and say nothing about Amsterdam.")
+    print("Executed steps: {0}".format(
+        " -> ".join(item.transformation for item in runtime.records)
+    ))
+    print("Reference comparison passed: {0}; max absolute error: {1:g}".format(
+        report.passed, report.max_absolute_error
+    ))
     print()
     print("  {0:<10}{1:>8}{2:>10}{3:>12}".format("district", "area", "covered", "proportion"))
     for name, shape in DISTRICTS:

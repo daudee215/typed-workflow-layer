@@ -153,6 +153,24 @@ class TestRefusal(unittest.TestCase):
         self.assertEqual(rejection.kind, "unknown_input")
         self.assertIn("traffic", rejection.explain())
 
+    def test_a_malformed_step_reference_is_reported(self):
+        rejection = why_rejected((
+            ("Constrain", ("$-1",)),
+        ), SOURCES)
+        self.assertEqual(rejection.kind, "unknown_input")
+        self.assertIn("non-negative step index", rejection.explain())
+
+    def test_overlay_reports_a_cross_slot_support_failure(self):
+        point_field = Dataset(
+            "points", CCDType(ccd.FIELD, ccd.NOMINAL, ccd.POINT_SUPPORT)
+        )
+        rejection = why_rejected(
+            (("Overlay", ("noise", "points")),),
+            SOURCES + (point_field,),
+        )
+        self.assertEqual(rejection.kind, "cross_slot")
+        self.assertIn("must agree on support", rejection.explain())
+
     def test_an_unknown_transformation_is_reported(self):
         rejection = why_rejected((("Kriging", ("noise",)),), SOURCES)
         self.assertEqual(rejection.kind, "unknown_transformation")

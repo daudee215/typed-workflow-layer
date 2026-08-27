@@ -72,6 +72,15 @@ class TestSignatures(unittest.TestCase):
             self.assertIn("->", entry.signature())
             self.assertEqual(entry.name, name)
 
+    def test_overlay_rejects_fields_on_different_supports(self):
+        overlay = catalogue.get("Overlay")
+        failures = overlay.check([
+            CCDType(ccd.FIELD, ccd.NOMINAL, ccd.REGION_SUPPORT),
+            CCDType(ccd.FIELD, ccd.NOMINAL, ccd.POINT_SUPPORT),
+        ])
+        self.assertEqual(len(failures), 1)
+        self.assertIn("must agree on support", str(failures[0]))
+
 
 class TestRepairSuggestions(unittest.TestCase):
     def test_only_coverage_reaches_an_object_from_a_nominal_field(self):

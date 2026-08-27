@@ -34,6 +34,13 @@ GRAMMAR = (
     "mean <field> for each <object>",
 )
 
+QUESTION_GRAMMAR = (
+    "what is the proportion of area covered by <op> <value> <field> "
+    "for each <object>",
+    "what proportion of each <object> is covered by <field> <op> <value>",
+    "what is the average <field> for each <object>",
+)
+
 _OPERATORS = (">=", "<=", "==", ">", "<")
 
 _TERM = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -70,6 +77,34 @@ _MEAN_PATTERN = re.compile(
     r"^mean\s+(?P<field>{term})\s+for\s+each\s+(?P<object>{term})$".format(
         term=_TERM
     ),
+    re.IGNORECASE,
+)
+
+_ENGLISH_THRESHOLD_1 = re.compile(
+    r"^what(?:\s+is)?\s+(?:the\s+)?(?P<answer>proportion|total\s+area)\s+"
+    r"of\s+(?:the\s+)?(?:area\s+)?covered\s+by\s+"
+    r"(?P<op>at\s+least|at\s+most|above|below|>=|<=|==|>|<|=)\s*"
+    r"(?P<value>{value})\s*(?P<unit>{unit})?\s+(?P<field>{term})\s+"
+    r"for\s+each\s+(?P<object>{term})(?:\s+in\s+.+)?$".format(
+        term=_TERM, op=_OP, value=_VALUE, unit=_UNIT
+    ),
+    re.IGNORECASE,
+)
+
+_ENGLISH_THRESHOLD_2 = re.compile(
+    r"^what\s+(?P<answer>proportion|total\s+area)\s+of\s+each\s+"
+    r"(?P<object>{term})\s+is\s+covered\s+by\s+(?P<field>{term})\s+"
+    r"(?P<op>at\s+least|at\s+most|above|below|>=|<=|==|>|<|=)\s*"
+    r"(?P<value>{value})\s*(?P<unit>{unit})?(?:\s+in\s+.+)?$".format(
+        term=_TERM, value=_VALUE, unit=_UNIT
+    ),
+    re.IGNORECASE,
+)
+
+_ENGLISH_MEAN = re.compile(
+    r"^what(?:\s+is)?\s+(?:the\s+)?(?:average|mean)\s+"
+    r"(?P<field>{term})\s+for\s+each\s+(?P<object>{term})"
+    r"(?:\s+in\s+.+)?$".format(term=_TERM),
     re.IGNORECASE,
 )
 
@@ -187,5 +222,46 @@ def parse(phrasing: str) -> TransformationRequest:
     raise ValueError(
         "cannot parse {0!r}. This parser recognises only:\n  {1}".format(
             phrasing, "\n  ".join(GRAMMAR)
+        )
+    )
+
+
+def parse_question(question: str) -> TransformationRequest:
+    """Parse a small, explicit English question surface into the same IR.
+
+    This is intentionally separate from :func:`parse`: controlled phrasing
+    remains strict and backwards compatible, while applications can accept a
+    few natural-looking forms without ever generating executable code. The
+    returned request is still constrained by the same target and transformation
+    requirements used by workflow synthesis.
+    """
+    if not isinstance(question, str):
+        raise ValueError("expected an English question as a string")
+    text = " ".join(question.strip().split())
+    if text.endswith("?"):
+        text = text[:-1].rstrip()
+
+    match = _ENGLISH_THRESHOLD_1.match(text) or _ENGLISH_THRESHOLD_2.match(text)
+    if match is not None:
+        answer = "proportion" if match.group("answer").lower().startswith("proportion") else "total area"
+        op = {
+            "at least": ">=", "at most": "<=", "above": ">", "below": "<",
+        }.get(match.group("op").lower(), match.group("op"))
+        unit = match.group("unit") or ""
+        controlled = "{0} of area where {1} {2} {3}{4} for each {5}".format(
+            answer, match.group("field"), op, match.group("value"),
+            " " + unit if unit else "", match.group("object")
+        )
+        return parse(controlled)
+
+    match = _ENGLISH_MEAN.match(text)
+    if match is not None:
+        return parse("mean {0} for each {1}".format(
+            match.group("field"), match.group("object")
+        ))
+
+    raise ValueError(
+        "cannot parse English question {0!r}. This interface recognises only:\n  {1}".format(
+            question, "\n  ".join(QUESTION_GRAMMAR)
         )
     )

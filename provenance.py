@@ -18,10 +18,13 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import quote
 
 from ccd import CCDType
 
 FORMAT_VERSION = "ctg/1"
+PROV_NS = "http://www.w3.org/ns/prov#"
+RDFS_NS = "http://www.w3.org/2000/01/rdf-schema#"
 
 
 @dataclass(frozen=True)
@@ -112,6 +115,101 @@ class ConceptualTransformationGraph:
 
     def to_json(self, indent: int = 2) -> str:
         return json.dumps(self.to_dict(), indent=indent)
+
+    @staticmethod
+    def _prov_id(kind: str, value: str) -> str:
+        return "urn:ctg:{0}:{1}".format(kind, quote(str(value), safe="._-"))
+
+    @staticmethod
+    def _literal(value: str) -> str:
+        return json.dumps(str(value), ensure_ascii=False)
+
+    def to_prov_json(self) -> dict:
+        """Return a dependency-free PROV-O shaped JSON document.
+
+        The ordinary CTG JSON remains the stable round-trip format. This
+        export adds interoperable entity/activity relations without requiring
+        rdflib or a serialisation package, so experiments can archive both the
+        compact graph and a standards-facing representation.
+        """
+        entities = []
+        for node in self.nodes:
+            entities.append({
+                "id": self._prov_id("entity", node.id),
+                "type": "prov:Entity",
+                "ccd_type": node.type.serialise(),
+                "kind": node.kind,
+                "label": node.label,
+            })
+        activities = []
+        generated = []
+        used = []
+        derived = []
+        for index, edge in enumerate(self.edges, start=1):
+            activity_id = self._prov_id("activity", edge.output)
+            output_id = self._prov_id("entity", edge.output)
+            activities.append({
+                "id": activity_id,
+                "type": "prov:Activity",
+                "transformation": edge.transformation,
+                "description": edge.description,
+            })
+            generated.append({"entity": output_id, "activity": activity_id})
+            for input_id in edge.inputs:
+                input_entity = self._prov_id("entity", input_id)
+                used.append({"activity": activity_id, "entity": input_entity})
+                derived.append({"generatedEntity": output_id,
+                                "usedEntity": input_entity})
+        return {
+            "@context": {
+                "prov": PROV_NS,
+                "rdfs": RDFS_NS,
+                "ccd_type": "urn:ctg:ccd_type",
+            },
+            "question": self.question,
+            "entity": entities,
+            "activity": activities,
+            "wasGeneratedBy": generated,
+            "used": used,
+            "wasDerivedFrom": derived,
+        }
+
+    def to_prov_turtle(self) -> str:
+        """Return deterministic PROV-O/Turtle for the conceptual graph."""
+        lines = [
+            "@prefix prov: <{0}> .".format(PROV_NS),
+            "@prefix rdfs: <{0}> .".format(RDFS_NS),
+            "@prefix ccd: <urn:ctg:> .",
+            "",
+        ]
+        for node in self.nodes:
+            subject = "<{0}>".format(self._prov_id("entity", node.id))
+            lines.append(
+                "{0} a prov:Entity ; ccd:ccd_type {1} ; ccd:kind {2} ; "
+                "rdfs:label {3} .".format(
+                    subject,
+                    self._literal(node.type.serialise()),
+                    self._literal(node.kind),
+                    self._literal(node.label),
+                )
+            )
+        for edge in self.edges:
+            activity = "<{0}>".format(self._prov_id("activity", edge.output))
+            output = "<{0}>".format(self._prov_id("entity", edge.output))
+            lines.append(
+                "{0} a prov:Activity ; ccd:transformation {1} ; "
+                "rdfs:label {2} .".format(
+                    activity,
+                    self._literal(edge.transformation),
+                    self._literal(edge.description),
+                )
+            )
+            lines.append("{0} prov:wasGeneratedBy {1} .".format(output, activity))
+            for input_id in edge.inputs:
+                source = "<{0}>".format(self._prov_id("entity", input_id))
+                lines.append("{0} prov:used {1} .".format(activity, source))
+                lines.append("{0} prov:wasDerivedFrom {1} .".format(output, source))
+        return "\n".join(lines) + "\n"
 
     @staticmethod
     def from_dict(payload: dict) -> "ConceptualTransformationGraph":

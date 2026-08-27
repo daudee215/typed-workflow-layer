@@ -91,5 +91,34 @@ class TestRefusal(unittest.TestCase):
             request_parser.parse("mean noise")
 
 
+class TestEnglishSurface(unittest.TestCase):
+    def test_english_threshold_question_maps_to_the_same_ir(self):
+        query = request_parser.parse_question(
+            "What is the proportion of area covered by >= 70 dB noise "
+            "for each district in Amsterdam?"
+        )
+        self.assertEqual(query.target.quality, ccd.INTENSIVE)
+        self.assertEqual(query.required_transformations(), frozenset({"Constrain"}))
+        self.assertEqual(str(query.constraints[0]), "noise >= 70 dB")
+
+    def test_at_least_wording_is_normalised(self):
+        query = request_parser.parse_question(
+            "What proportion of each district is covered by noise at least 70 dB?"
+        )
+        self.assertEqual(query.constraints[0].operator, ">=")
+
+    def test_average_wording_maps_to_mean(self):
+        query = request_parser.parse_question(
+            "What is the average noise for each district?"
+        )
+        self.assertEqual(query.target.quality, ccd.INTENSIVE)
+        self.assertEqual(query.constraints, ())
+
+    def test_unsupported_english_is_refused_with_its_own_grammar(self):
+        with self.assertRaises(ValueError) as caught:
+            request_parser.parse_question("Which districts are noisy?")
+        self.assertIn("what is the proportion", str(caught.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

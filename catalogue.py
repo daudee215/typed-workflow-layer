@@ -48,6 +48,25 @@ class SlotMismatch:
 
 
 @dataclass(frozen=True)
+class CrossSlotMismatch:
+    """A relation between slots that componentwise typing cannot express."""
+
+    slots: tuple
+    axis: str
+    actual: tuple
+
+    def __str__(self) -> str:
+        rendered = ", ".join(str(item) for item in self.actual)
+        return (
+            "slots {0} must agree on {1}; received {2}".format(
+                ", ".join(str(item) for item in self.slots),
+                self.axis,
+                rendered,
+            )
+        )
+
+
+@dataclass(frozen=True)
 class Transformation:
     """A typed transformation signature."""
 
@@ -57,6 +76,7 @@ class Transformation:
     description: str
     inherit_quality_from: Optional[int] = None
     inherit_support_from: Optional[int] = None
+    same_support_slots: tuple = ()
 
     @property
     def arity(self) -> int:
@@ -75,6 +95,12 @@ class Transformation:
                 found.append(
                     SlotMismatch(index, required, given, axis_mismatches)
                 )
+        for slots in self.same_support_slots:
+            if len(slots) < 2:
+                raise ValueError("a cross-slot constraint needs two slots")
+            supports = tuple(actual[index].support for index in slots)
+            if len(set(supports)) > 1:
+                found.append(CrossSlotMismatch(slots, "support", supports))
         return tuple(found)
 
     def accepts(self, actual: Sequence[CCDType]) -> bool:
@@ -104,6 +130,11 @@ class Transformation:
             inherited.append("support from slot %d" % self.inherit_support_from)
         if inherited:
             out += " with " + " and ".join(inherited)
+        if self.same_support_slots:
+            out += "; slots {0} share support".format(
+                ", ".join(",".join(str(item) for item in slots)
+                            for slots in self.same_support_slots)
+            )
         return "{0}: {1} -> {2}".format(self.name, given, out)
 
 
@@ -220,14 +251,13 @@ _ENTRIES = (
     ),
     Transformation(
         name="Overlay",
-        # Debatable. Two fields are combined only if they share a support, and
-        # this signature does not check that, because the componentwise type
-        # model has no way to say that two slots must agree. The output copies
-        # the support of the first slot, which is a stated assumption rather
-        # than a derived fact.
+        # Two fields are combined only if they share a support. This is a
+        # relation between inputs rather than a componentwise requirement, so
+        # it is declared explicitly instead of being hidden in the executor.
         inputs=(CCDType(FIELD, NOMINAL), CCDType(FIELD, NOMINAL)),
         output=CCDType(FIELD, NOMINAL),
         inherit_support_from=0,
+        same_support_slots=((0, 1),),
         description="Combine two classified fields into one classified field.",
     ),
 )

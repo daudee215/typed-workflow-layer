@@ -92,6 +92,22 @@ class TestSerialisation(unittest.TestCase):
         with self.assertRaises(ValueError):
             provenance.ConceptualTransformationGraph.from_dict(payload)
 
+    def test_prov_json_has_entities_activities_and_relations(self):
+        payload = build_graph().to_prov_json()
+        self.assertEqual(len(payload["entity"]), 5)
+        self.assertEqual(len(payload["activity"]), 3)
+        self.assertEqual(len(payload["wasGeneratedBy"]), 3)
+        self.assertEqual(len(payload["used"]), 4)
+        self.assertEqual(payload["activity"][0]["transformation"], "Constrain")
+
+    def test_prov_turtle_contains_the_core_prov_relations(self):
+        turtle = build_graph().to_prov_turtle()
+        self.assertIn("prov:Entity", turtle)
+        self.assertIn("prov:Activity", turtle)
+        self.assertIn("prov:wasGeneratedBy", turtle)
+        self.assertIn("prov:used", turtle)
+        self.assertIn('"Constrain"', turtle)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,12 @@ put in front of people and scored in
 
 Python 3.10, standard library only. No numpy, no geopandas, no external packages.
 
+The repository now contains a complete, reproducible vertical slice: a typed
+workflow can be bound to runtime values, executed by a rectangle backend,
+checked against a reference output, and exported with PROV-O relations. The
+backend is intentionally small; it is an experiment seam for a future
+CRS-aware GIS adapter, not a claim to replace one.
+
 The type lattice is an OWL ontology, `typed_workflow_layer/ontology/ccd.ttl`. `owl.py` reads it at import
 and `ccd.py` builds the subsumption relation from its rdfs:subClassOf axioms, so the
 hierarchy is data a reasoner can read rather than a dict only this package understands.
@@ -89,6 +95,39 @@ a `redundancy` cost, but the cost is now a check on chains arriving through `bui
 rather than something that separates enumerated candidates. The same fact arrives from the
 cost side under "Whether the ranking is doing any work" below: `redundancy` is one of three
 components that never vary on this scenario, so its weight is inert here at any value.
+
+## Execution, provenance and correctness
+
+`executor.py` is the runtime seam. `RuntimeDataset` keeps the declared CCD
+type beside each payload, `execute()` validates those types before running any
+backend operation, and `ExecutionResult.records` records every input, output,
+type and parameter used. The bundled `RectangularBackend` implements
+`Constrain`, `Clip`, `Coverage`, `ZonalStatistics`, `Aggregate`, `Proportion`,
+`Reclassify`, `Buffer` and `Overlay` over validated axis-aligned rectangles.
+Unsupported operations fail explicitly instead of silently producing a fake
+answer.
+
+The backend is deliberately replaceable. A production adapter can implement
+the same `Backend.run()` contract for GeoPandas, PostGIS, GDAL or QGIS while
+leaving the type checker and search unchanged. This separation is useful for
+the PhD workflow: semantic admissibility, execution, and empirical correctness
+are measurable as separate claims.
+
+`evaluation.py` compares an execution result with a reference value, reporting
+missing keys, unexpected keys, absolute error and relative error. This makes a
+type-valid but numerically wrong workflow visible. `provenance.py` retains the
+compact CTG JSON format and now also exports PROV-O-shaped JSON and deterministic
+Turtle with `prov:Entity`, `prov:Activity`, `prov:used`,
+`prov:wasGeneratedBy` and `prov:wasDerivedFrom` relations.
+
+Run the executable worked example with:
+
+```
+python demo.py
+```
+
+The demo now prints the executed steps and the reference-comparison result in
+addition to the type-synthesis and ranking evidence.
 
 ## Measuring the search instead of asserting things about it
 
@@ -172,15 +211,15 @@ measurement agreeing independently.
 
 ## What it is not
 
-It is not a GIS. It does not read geodata, does not project anything, and does not
-execute a workflow against real data. The only geometry in the repository is a handful
-of integer rectangles inside `demo.py`, so that the last section of the demo prints
-numbers that came from an actual computation rather than from nowhere. The point being
-demonstrated is the typing, not the geometry.
+It is not a production GIS. It does not read shapefiles or databases, manage CRS
+transformations, validate polygon topology, or execute against real Amsterdam data. The
+bundled rectangle backend is a deterministic test and research backend, so the demo
+prints values from an actual execution while keeping its geometry assumptions explicit.
 
-It is not a question answering system. `request.py` recognises three fixed phrasings and
-raises on everything else. There is no natural language step anywhere, and the demo says
-so at the point where a human transcribes the question by hand.
+It is not a general question answering system. `request.py` keeps a strict controlled
+parser and additionally offers `parse_question()` for a few explicit English surface
+forms. It still raises on unsupported wording and returns a typed request rather than
+generating code.
 
 It is not the published CCD ontology. `typed_workflow_layer/ontology/ccd.ttl` is an OWL ontology written for
 this package: seventeen classes over three axes, with the modelling arguments carried as
@@ -241,9 +280,8 @@ than one of them.
    only says no is a type checker nobody keeps.
 
 7. **Signatures that are debatable say so.** `Aggregate`, `Buffer` and `Overlay` carry
-   comments explaining what is being assumed. `Overlay` in particular cannot express
-   that its two slots must share a support, because the componentwise model has no way
-   to say that two slots agree.
+   comments explaining what is being assumed. `Overlay` now adds an explicit cross-slot
+   support constraint, so fields on point and region supports cannot be combined silently.
 
 8. **Three search restrictions**, all marked in `synthesis.py` as heuristics rather than
    claims about geography: distinct datasets across slots, no transformation applied to
@@ -253,16 +291,17 @@ than one of them.
 
 Read this section before the code.
 
-- **Toy geometry.** Axis aligned integer rectangles, assumed disjoint, intersected with
-  four comparisons. No CRS, no projection, no topology, no validity checking. The
-  library contains no geometry at all.
-- **No execution.** Nothing here runs against real geodata. A synthesised workflow is a
-  graph of names and types. Binding each name to a real operation is the next piece of
-  work and it is not started.
+- **Toy geometry.** Axis aligned integer rectangles, with validated bounds and
+  intersection arithmetic. No CRS, projection, topology, or polygon validity
+  checking is provided.
+- **Toy execution only.** `executor.py` runs the bundled rectangle backend but
+  not shapefiles, databases, or real Amsterdam data. Real geodata adapters and
+  backend-parity tests remain future work.
 - **A tiny catalogue.** Ten transformations. The CCD work covers a far larger operation
   set, and several signatures here would be argued over.
-- **No CNL.** Three fixed phrasings and a regular expression. The transcription from the
-  English question to the controlled phrasing is done by a human in `demo.py`.
+- **Small question surface.** Three controlled phrasings plus a few explicit
+  English forms are supported. This is not open-ended natural-language
+  understanding and does not infer missing datasets or units.
 - **Depth-bounded search.** The demo runs at depth 4. Nothing here says what happens at
   depth 8, and the counts printed in section 4 suggest it grows quickly.
 - **The cost model has no gold standard behind it.** `cost.py` ranks the 24 admissible
@@ -274,19 +313,19 @@ Read this section before the code.
 - **Cost weights are policy.** The six weights in `cost.Weights` were chosen so that one
   scale descent early outranks any plausible difference in length. That is an argument,
   not a measurement, and it is why the sensitivity facility exists.
-- **No support checking between slots.** `Overlay` accepts two fields with different
-  supports. That is a real hole and it is left open rather than papered over.
+- **Support checking is explicit but limited.** `Overlay` now rejects fields
+  with different supports. More complex relations, such as partition and
+  topology constraints, still need a richer constraint language.
 - **No treatment of Network or Event.** Both terms exist on the concept axis and no
   transformation in the catalogue uses either.
-- **The type layer proves admissibility, not correctness.** A workflow that type checks
-  can still be the wrong answer to the question asked. That is the honest boundary of
-  the whole approach and it is why the constraint mechanism in `request.py` exists.
+- **Type validity is not correctness.** `evaluation.py` makes the distinction
+  testable, but the bundled reference is synthetic. A PhD evaluation needs
+  real datasets, gold outputs, perturbation tests, and analyst review.
 
 ## What I would build next, in order
 
-1. Bind each catalogue entry to a real operation, one GDAL or QGIS processing algorithm
-   per transformation, so a synthesised workflow can be run and its output compared with
-   a hand written reference at the level of the operation graph.
+1. Bind the backend contract to real operations, one GDAL, QGIS, PostGIS or GeoPandas
+   implementation per transformation, and compare outputs with hand-written references.
 2. Run a reasoner over the ontology rather than only reading its asserted axioms. The
    hierarchy is already OWL and rdflib agrees with the reader triple for triple, so the
    remaining step is entailment: materialise the closure with owlrl, and replace the
@@ -296,11 +335,10 @@ Read this section before the code.
    `ranking.agreement` against it. If tau is low, `ranking.disagreements` names the pairs
    to argue about, and each one is either a counterexample or a missing term in the cost
    model. This is the piece that turns the ranking from defensible into validated.
-4. Replace the controlled phrasing with a question interface that emits a target type
-   and a set of constraints rather than emitting code, so that whatever produces it,
-   a grammar or a language model, is still checked by the same layer.
-5. Move provenance to PROV-O. The graph already carries an entity, an activity and a
-   derivation, so this is a change of writer rather than a change of model.
+4. Expand the question interface while keeping the typed request as the only boundary
+   into synthesis; unsupported or ambiguous questions should be refused explicitly.
+5. Add benchmark datasets, execution timing, error propagation, and ablations so the
+   system can be evaluated on semantic validity, numerical correctness, and robustness.
 
 ## Files
 
@@ -311,13 +349,15 @@ Read this section before the code.
 | `ccd.py` | the three axes, subsumption, unification, and the mismatch report |
 | `catalogue.py` | ten typed transformations and the repair suggestion facility |
 | `synthesis.py` | enumeration of all valid workflows, and `why_rejected` |
-| `provenance.py` | the conceptual transformation graph, JSON and text tree |
-| `request.py` | three controlled phrasings to a target type plus constraints |
+| `provenance.py` | the conceptual transformation graph, CTG JSON, PROV JSON and Turtle |
+| `request.py` | controlled phrasings and a small English surface to typed requests |
+| `executor.py` | runtime validation, backend contract, rectangle execution and traces |
+| `evaluation.py` | reference comparison with absolute and relative error reporting |
 | `cost.py` | scale, support, concept, length, source and redundancy cost, position weighted |
 | `ranking.py` | ordering, pairwise explanation, plan rendering, Kendall's tau, sensitivity |
 | `demo.py` | the Amsterdam example, two refusals, the toy geometry, and the ranking |
 | `analysis.py` | soundness, growth, ablation, type closure, ranking discrimination |
-| `tests/` | 167 unittest cases, one file per module, including a run of the demo |
+| `tests/` | regression, execution, provenance, evaluation and demo tests |
 
 ## Licence
 
