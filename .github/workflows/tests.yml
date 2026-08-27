@@ -40,3 +40,23 @@ jobs:
         # printed by this script, and the README tells the reader to run it.
         # About 11 seconds.
         run: python analysis.py > /dev/null
+
+  ontology-cross-check:
+    name: the ontology against a real RDF parser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install '.[check]'
+      - name: The rdflib comparison must actually run here, not skip
+        # The dependency-free reader agreeing with itself proves nothing. This
+        # job exists so the comparison against rdflib cannot quietly disappear
+        # the way an optional test does on a machine that lacks the package.
+        run: |
+          python -m unittest tests.test_owl -v 2>&1 | tee owl.txt
+          if grep -q "skipped" owl.txt; then
+            echo "The rdflib cross-check skipped in the job that exists to run it."
+            exit 1
+          fi

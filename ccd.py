@@ -6,20 +6,21 @@ support. Each axis is a small subsumption lattice. A dataset is admissible in
 a transformation slot when the type declared for the slot subsumes the type of
 the dataset.
 
+Where the hierarchy lives. Not here. `ontology/ccd.ttl` is an OWL ontology and
+this module reads it at import through `owl.py`, building one parent map per
+axis from the rdfs:subClassOf axioms. Nothing below hard-codes a parent, so
+editing the lattice means editing the ontology, and the same file can be handed
+to a reasoner. The modelling arguments that used to sit in comments here are
+rdfs:comment annotations there, next to the axiom each one justifies.
+
 Design note on the shape of the model. The three axes are kept independent and
 compared componentwise, rather than flattened into one hierarchy of named
-composite types such as PointMeasures or ExistenceRaster as the published CCD
-ontology does. Componentwise comparison is weaker: it cannot express that some
-combinations of concept, quality and support are meaningless. It is enough to
-reject the chains this package is about, and it can be read in a few minutes,
-which an OWL ontology cannot.
-
-Design note on ExtensiveQuantity and IntensiveQuantity. Both are ratio-scaled,
-so Stevens' scale hierarchy alone cannot separate them, yet the difference
-decides whether a quantity may be summed across objects. Covered area per
-district is extensive and adds up. A proportion or a mean is intensive and does
-not. Making them distinct subtypes of Ratio is the single choice that gives the
-rest of the package something to check.
+composite types such as PointMeasures or ExistenceRaster. Componentwise
+comparison is weaker: it cannot express that some combinations of concept,
+quality and support are meaningless. It is enough to reject the chains this
+package is about. The cost is a constraint the loader enforces rather than
+assumes: each axis must be a single chain, so a class declaring two
+superclasses raises at import instead of quietly changing what subsumes what.
 """
 
 from __future__ import annotations
@@ -27,18 +28,29 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-# Core concepts. Network and Event sit beside Object rather than beneath it:
-# a network is made of objects but is not itself one, and treating it as a
-# subtype would let object transformations apply to networks silently.
+import owl
+
+ONTOLOGY = owl.Ontology(owl.load())
+
+# The three axis roots, identified by the ccd:axis annotation rather than by
+# name, so renaming a root in the ontology is caught here instead of producing
+# an empty axis.
+_AXIS_PROPERTY = "https://daudee.com/ns/ccd#axis"
+_ROOTS = {}
+for _subject, _predicate, _object in ONTOLOGY.triples:
+    if _predicate == _AXIS_PROPERTY:
+        _ROOTS[_object.strip('"')] = _subject
+if set(_ROOTS) != {"core concept", "quality", "support"}:
+    raise owl.OntologyError(
+        "expected three ccd:axis roots, found {0!r}".format(sorted(_ROOTS)))
+
+# Term names, read back from the ontology so a typo here fails at import.
 ANY_CONCEPT = "AnyConcept"
 FIELD = "Field"
 OBJECT = "Object"
 NETWORK = "Network"
 EVENT = "Event"
 
-# Quality, ordered by Stevens' scales. More specific means more structure, so
-# Ratio is a subtype of Interval, and a slot that asks for Nominal accepts a
-# ratio-scaled attribute because the extra structure can always be ignored.
 ANY_QUALITY = "AnyQuality"
 NOMINAL = "Nominal"
 ORDINAL = "Ordinal"
@@ -48,41 +60,38 @@ EXTENSIVE = "ExtensiveQuantity"
 INTENSIVE = "IntensiveQuantity"
 COUNT = "Count"
 
-# Support: the geometry over which a value is defined.
 ANY_SUPPORT = "AnySupport"
 POINT_SUPPORT = "PointSupport"
 REGION_SUPPORT = "RegionSupport"
 LATTICE_SUPPORT = "LatticeSupport"
 
-CONCEPT_PARENT = {
-    ANY_CONCEPT: None,
-    FIELD: ANY_CONCEPT,
-    OBJECT: ANY_CONCEPT,
-    NETWORK: ANY_CONCEPT,
-    EVENT: ANY_CONCEPT,
-}
+# One parent map per axis, derived from the rdfs:subClassOf axioms. The names
+# below are the same ones the ontology declares; single_parent_map raises if a
+# class under a root has anything other than exactly one superclass.
+CONCEPT_PARENT = ONTOLOGY.single_parent_map(_ROOTS["core concept"])
+QUALITY_PARENT = ONTOLOGY.single_parent_map(_ROOTS["quality"])
+SUPPORT_PARENT = ONTOLOGY.single_parent_map(_ROOTS["support"])
 
-QUALITY_PARENT = {
-    ANY_QUALITY: None,
-    NOMINAL: ANY_QUALITY,
-    ORDINAL: NOMINAL,
-    INTERVAL: ORDINAL,
-    RATIO: INTERVAL,
-    EXTENSIVE: RATIO,
-    INTENSIVE: RATIO,
-    # A count is extensive: counts over disjoint regions add up. Placing Count
-    # under ExtensiveQuantity rather than directly under Ratio is a decision,
-    # and it is the one that makes Aggregate accept counts without a special
-    # case.
-    COUNT: EXTENSIVE,
-}
-
-SUPPORT_PARENT = {
-    ANY_SUPPORT: None,
-    POINT_SUPPORT: ANY_SUPPORT,
-    REGION_SUPPORT: ANY_SUPPORT,
-    LATTICE_SUPPORT: ANY_SUPPORT,
-}
+# Every constant this module exports must be a term the ontology declares.
+# Without this check a renamed class in the ontology would leave a constant
+# pointing at nothing, and the failure would surface as an unrelated
+# ValueError deep inside a type check rather than here.
+for _axis_map, _expected in (
+    (CONCEPT_PARENT, (ANY_CONCEPT, FIELD, OBJECT, NETWORK, EVENT)),
+    (QUALITY_PARENT, (ANY_QUALITY, NOMINAL, ORDINAL, INTERVAL, RATIO,
+                      EXTENSIVE, INTENSIVE, COUNT)),
+    (SUPPORT_PARENT, (ANY_SUPPORT, POINT_SUPPORT, REGION_SUPPORT,
+                      LATTICE_SUPPORT)),
+):
+    _missing = [term for term in _expected if term not in _axis_map]
+    if _missing:
+        raise owl.OntologyError(
+            "the ontology does not declare {0}".format(", ".join(_missing)))
+    _extra = sorted(set(_axis_map) - set(_expected))
+    if _extra:
+        raise owl.OntologyError(
+            "the ontology declares {0}, which this module does not export. Add "
+            "a constant for it or remove it".format(", ".join(_extra)))
 
 # (readable axis label, attribute name on CCDType, parent map)
 _AXES = (

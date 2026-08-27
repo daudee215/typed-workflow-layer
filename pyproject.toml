@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "typed-workflow-layer"
+version = "0.1.0"
+description = "A typed intermediate layer between a geo-analytical question and the workflows that answer it, with the type lattice held as an OWL ontology"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENCE" }
+authors = [{ name = "M. Daud Tasleem", email = "daudtasleem215@gmail.com" }]
+keywords = ["GIScience", "question answering", "workflow synthesis", "OWL", "ontology", "core concept data types"]
+
+# Nothing to install. The ontology is read by a standard-library Turtle reader
+# rather than by rdflib, because the claim that this runs from a bare
+# interpreter is worth more than the few hundred lines that claim costs.
+dependencies = []
+
+[project.optional-dependencies]
+# Used only by tests/test_owl.py, which parses ontology/ccd.ttl with a real RDF
+# implementation and asserts it returns the same triples. The test skips when
+# rdflib is absent, and a CI job installs it so the comparison cannot skip
+# there.
+check = ["rdflib>=6"]
+
+[project.urls]
+Homepage = "https://github.com/daudee215/typed-workflow-layer"
+Related = "https://github.com/daudee215/geo-annotation-kit"
+
+[tool.setuptools]
+py-modules = ["ccd", "owl", "catalogue", "synthesis", "provenance", "request", "cost", "ranking", "analysis", "demo"]
+
+[tool.setuptools.package-data]
+"*" = ["ontology/*.ttl"]

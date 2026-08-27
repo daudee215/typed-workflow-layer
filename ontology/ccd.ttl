@@ -1,0 +1,95 @@
+# Core concept data types, as an OWL ontology.
+#
+# This file is the authority for the type lattice. ccd.py reads it at import
+# and builds the subsumption relation from these triples; nothing in the Python
+# hard-codes a parent. Changing the hierarchy means editing this file.
+#
+# The modelling decisions that used to sit in Python comments are rdfs:comment
+# annotations here, where they belong: a reader who opens the ontology sees why
+# Count is extensive without also reading the implementation.
+
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix ccd:  <https://daudee.com/ns/ccd#> .
+
+ccd:Ontology a owl:Ontology ;
+    rdfs:label "Core concept data types" ;
+    rdfs:comment "A type system for geo-analytical question answering, after Kuhn's core concepts of spatial information and the core concept data type ontology of Scheider, Meerlo, Kasalica and Lamprecht (2020). Three independent axes: core concept, quality, support." .
+
+ccd:axis a owl:AnnotationProperty ;
+    rdfs:label "axis" ;
+    rdfs:comment "Names the axis a class belongs to. Declared on the three roots only; every other class inherits its axis from the root it descends from." .
+
+# ---------------------------------------------------------------- concept
+
+ccd:AnyConcept a owl:Class ;
+    ccd:axis "core concept" ;
+    rdfs:label "AnyConcept" ;
+    rdfs:comment "Top of the core concept axis. A transformation slot typed AnyConcept accepts any concept, which is how a signature says it does not care." .
+
+ccd:Field a owl:Class ;
+    rdfs:subClassOf ccd:AnyConcept ;
+    rdfs:comment "A value defined everywhere over a region, such as a noise surface." .
+
+ccd:Object a owl:Class ;
+    rdfs:subClassOf ccd:AnyConcept ;
+    rdfs:comment "A discrete thing carrying attributes, such as a district." .
+
+ccd:Network a owl:Class ;
+    rdfs:subClassOf ccd:AnyConcept ;
+    rdfs:comment "Sits beside Object rather than beneath it. A network is made of objects but is not itself one, and making it a subclass would let every object transformation apply to a network silently." .
+
+ccd:Event a owl:Class ;
+    rdfs:subClassOf ccd:AnyConcept ;
+    rdfs:comment "Sits beside Object for the same reason as Network. No transformation in the catalogue consumes or produces one yet; the term is here so its absence is visible." .
+
+# ---------------------------------------------------------------- quality
+
+ccd:AnyQuality a owl:Class ;
+    ccd:axis "quality" ;
+    rdfs:label "AnyQuality" ;
+    rdfs:comment "Top of the quality axis." .
+
+ccd:Nominal a owl:Class ;
+    rdfs:subClassOf ccd:AnyQuality ;
+    rdfs:comment "Stevens' scales run from least to most structured, and the subclass direction follows the structure. Ratio is a subclass of Interval because a slot asking for Nominal can always ignore the extra structure a ratio-scaled attribute carries." .
+
+ccd:Ordinal a owl:Class ;
+    rdfs:subClassOf ccd:Nominal .
+
+ccd:Interval a owl:Class ;
+    rdfs:subClassOf ccd:Ordinal .
+
+ccd:Ratio a owl:Class ;
+    rdfs:subClassOf ccd:Interval .
+
+ccd:ExtensiveQuantity a owl:Class ;
+    rdfs:subClassOf ccd:Ratio ;
+    rdfs:comment "Adds up over disjoint supports. Covered area per district is extensive. Both extensive and intensive quantities are ratio scaled, so Stevens' scales alone cannot separate them, and separating them is the single choice that gives the rest of the package something to check." .
+
+ccd:IntensiveQuantity a owl:Class ;
+    rdfs:subClassOf ccd:Ratio ;
+    rdfs:comment "Does not add up over disjoint supports. A proportion or a mean is intensive. A system that cannot tell it from an extensive quantity will happily sum a column of percentages." .
+
+ccd:Count a owl:Class ;
+    rdfs:subClassOf ccd:ExtensiveQuantity ;
+    rdfs:comment "Placed under ExtensiveQuantity rather than directly under Ratio, because counts over disjoint regions add up. That placement is what lets Aggregate accept a count with no special case." .
+
+# ---------------------------------------------------------------- support
+
+ccd:AnySupport a owl:Class ;
+    ccd:axis "support" ;
+    rdfs:label "AnySupport" ;
+    rdfs:comment "Top of the support axis: the geometry a value is defined over." .
+
+ccd:PointSupport a owl:Class ;
+    rdfs:subClassOf ccd:AnySupport .
+
+ccd:RegionSupport a owl:Class ;
+    rdfs:subClassOf ccd:AnySupport .
+
+ccd:LatticeSupport a owl:Class ;
+    rdfs:subClassOf ccd:AnySupport ;
+    rdfs:comment "A regular tessellation, such as a raster. Beside RegionSupport rather than beneath it: a lattice cell is a region, but a transformation written for arbitrary regions may assume nothing about tiling." .

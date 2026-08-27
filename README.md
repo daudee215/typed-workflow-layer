@@ -14,6 +14,13 @@ put in front of people and scored in
 
 Python 3.10, standard library only. No numpy, no geopandas, no external packages.
 
+The type lattice is an OWL ontology, `ontology/ccd.ttl`. `owl.py` reads it at import
+and `ccd.py` builds the subsumption relation from its rdfs:subClassOf axioms, so the
+hierarchy is data a reasoner can read rather than a dict only this package understands.
+The reader is a few hundred lines of standard library covering the Turtle subset the
+ontology uses; rdflib is not required to run it, and is used instead as a cross-check
+that the two parsers return the same triples (`pip install '.[check]'`).
+
 ```
 python3 demo.py
 python3 -m unittest discover -s tests
@@ -175,8 +182,10 @@ It is not a question answering system. `request.py` recognises three fixed phras
 raises on everything else. There is no natural language step anywhere, and the demo says
 so at the point where a human transcribes the question by hand.
 
-It is not the CCD ontology. It is a readable approximation of the part of it that does
-the work described below.
+It is not the published CCD ontology. `ontology/ccd.ttl` is an OWL ontology written for
+this package: seventeen classes over three axes, with the modelling arguments carried as
+rdfs:comment next to the axiom each one justifies. It approximates the part of the
+published ontology that does the work described below.
 
 ## Theory
 
@@ -201,7 +210,9 @@ than one of them.
 1. **The three axes are compared componentwise** rather than flattened into named
    composite types. This is weaker than the published ontology: it cannot say that some
    combinations of concept, quality and support are meaningless. It is enough for the
-   refusals shown here and it can be read in a few minutes.
+   refusals shown here. The cost is a constraint the loader enforces rather than assumes:
+   each axis has to be a single chain, so a class declaring two superclasses raises at
+   import instead of quietly changing what subsumes what.
 
 2. **The scale hierarchy runs from nominal down to ratio.** A slot that asks for
    `Nominal` accepts a ratio-scaled field, because the extra structure can always be
@@ -276,8 +287,11 @@ Read this section before the code.
 1. Bind each catalogue entry to a real operation, one GDAL or QGIS processing algorithm
    per transformation, so a synthesised workflow can be run and its output compared with
    a hand written reference at the level of the operation graph.
-2. Replace the componentwise axes with the published CCD ontology, loaded from OWL and
-   checked with a reasoner, keeping the current model as a fast pre-filter.
+2. Run a reasoner over the ontology rather than only reading its asserted axioms. The
+   hierarchy is already OWL and rdflib agrees with the reader triple for triple, so the
+   remaining step is entailment: materialise the closure with owlrl, and replace the
+   handwritten axis chains with the published CCD ontology, keeping this one as a fast
+   pre-filter.
 3. Collect a preference ordering from two or three analysts over the 24, and run
    `ranking.agreement` against it. If tau is low, `ranking.disagreements` names the pairs
    to argue about, and each one is either a counterexample or a missing term in the cost
@@ -292,6 +306,8 @@ Read this section before the code.
 
 | file | what it holds |
 | --- | --- |
+| `ontology/ccd.ttl` | the type lattice as OWL: seventeen classes, three axes, annotated |
+| `owl.py` | a dependency-free Turtle reader, and the subsumption relation it builds |
 | `ccd.py` | the three axes, subsumption, unification, and the mismatch report |
 | `catalogue.py` | ten typed transformations and the repair suggestion facility |
 | `synthesis.py` | enumeration of all valid workflows, and `why_rejected` |
@@ -301,7 +317,7 @@ Read this section before the code.
 | `ranking.py` | ordering, pairwise explanation, plan rendering, Kendall's tau, sensitivity |
 | `demo.py` | the Amsterdam example, two refusals, the toy geometry, and the ranking |
 | `analysis.py` | soundness, growth, ablation, type closure, ranking discrimination |
-| `tests/` | 147 unittest cases, one file per module, including a run of the demo |
+| `tests/` | 167 unittest cases, one file per module, including a run of the demo |
 
 ## Licence
 
