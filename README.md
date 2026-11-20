@@ -12,7 +12,7 @@ typed sources this package consumes; the answers this package's workflows produc
 put in front of people and scored in
 [geoqa-study-harness](https://github.com/daudee215/geoqa-study-harness).
 
-Python 3.10 or later. The core and the worked examples use the standard library.
+Python 3.10 or later. The core and the rectangle examples use the standard library.
 
 ## Amsterdam road-noise example
 
@@ -46,13 +46,35 @@ See the [input provenance and regeneration guide](examples/data/amsterdam_noise/
 [reference counts](examples/data/amsterdam_noise/reference.json), and
 [citation metadata](CITATION.cff).
 
+## Amsterdam neighbourhoods with the GIS backend
+
+The optional GIS backend runs the same typed workflow over real CBS neighbourhood
+boundaries. From a source checkout with a virtual environment active:
+
+```bash
+python -m pip install ".[gis]"
+python -m examples.amsterdam_polygons
+```
+
+| CBS neighbourhood | Share at or above 70 dB Lden |
+| --- | ---: |
+| Robert Scottbuurt West | 26.60% |
+| John Franklinbuurt | 5.67% |
+| Begijnhofbuurt | 2.47% |
+
+The backend measures each cell's intersection with the polygon, including partial
+cells and holes. It divides qualifying area by the whole neighbourhood area in
+the shared projected CRS. If nodata or the raster boundary leaves a measurable
+area uncovered, it raises an error. The three results match an independently
+computed GDAL fractional-pixel reference. [Inputs, attribution and reference method](examples/data/amsterdam_polygons/README.md)
+
 ## Core implementation
 
 The repository now contains a complete, reproducible vertical slice: a typed
 workflow can be bound to runtime values, executed by a rectangle backend,
 checked against a reference output, and exported with PROV-O relations. The
-backend is intentionally small; it is an experiment seam for a future
-CRS-aware GIS adapter, not a claim to replace one.
+rectangle backend supports the offline examples, and the optional GIS backend
+uses Rasterio and Shapely for fractional raster coverage over polygons.
 
 The type lattice is an OWL ontology, `typed_workflow_layer/ontology/ccd.ttl`. `owl.py` reads it at import
 and `ccd.py` builds the subsumption relation from its rdfs:subClassOf axioms, so the
@@ -144,11 +166,11 @@ of the runtime trace and output, so repeated runs can be checked or cached.
 Coverage also computes rectangle union area, avoiding double-counting when
 input contours overlap.
 
-The backend is deliberately replaceable. A production adapter can implement
-the same `Backend.run()` contract for GeoPandas, PostGIS, GDAL or QGIS while
-leaving the type checker and search unchanged. This separation is useful for
-the PhD workflow: semantic admissibility, execution, and empirical correctness
-are measurable as separate claims.
+The optional `typed_workflow_layer.gis_backend.RasterPolygonBackend` implements
+the same `Backend.run()` contract for `Constrain`, `Coverage` and `Proportion`.
+Bind a `RasterField` and `PolygonZones` in a shared projected metre CRS and pass
+the backend to `execute(..., backend=RasterPolygonBackend())`. Its results use the
+same typed workflow, trace and reference comparison as the rectangle example.
 
 `evaluation.py` compares an execution result with a reference value, reporting
 missing keys, unexpected keys, absolute error and relative error. This makes a
@@ -328,9 +350,9 @@ than one of them.
 
 Read this section before the code.
 
-- **Geometry and CRS.** The bundled backend uses pre-aligned, axis-aligned
-  rectangles. The RIVM example binds native grid cells in a single projected CRS.
-  Polygon geometry, reprojection and mixed-CRS input are future backend work.
+- **Geometry and CRS.** The GIS backend accepts valid polygons and multipolygons
+  and a bounded, north-up raster in the same projected metre CRS. Supply prepared
+  inputs when reprojection, rotation or resampling is needed.
 - **A tiny catalogue.** Ten transformations. The CCD work covers a far larger operation
   set, and several signatures here would be argued over.
 - **Small question surface.** Three controlled phrasings plus a few explicit
@@ -352,14 +374,15 @@ Read this section before the code.
   topology constraints, still need a richer constraint language.
 - **No treatment of Network or Event.** Both terms exist on the concept axis and no
   transformation in the catalogue uses either.
-- **Reference coverage.** `evaluation.py` checks the synthetic demo and the
-  three RIVM windows. A broader evaluation needs independent reference outputs
-  across questions, perturbation tests, and analyst review.
+- **Reference coverage.** The checks cover the synthetic demo, three RIVM windows
+  and three CBS neighbourhoods. A broader evaluation needs independent reference
+  outputs across questions, perturbation tests, and analyst review.
 
 ## Next versions
 
-The [roadmap](ROADMAP.md) sets out the CRS-aware backend, a benchmark for
-answers and ranking, and later work on the question interface and OWL entailment.
+The [roadmap](ROADMAP.md) records the GIS backend release and plans the next
+benchmark for answers and ranking, followed by work on the question interface
+and OWL entailment.
 
 ## Files
 
@@ -378,6 +401,8 @@ answers and ranking, and later work on the question interface and OWL entailment
 | `ranking.py` | ordering, pairwise explanation, plan rendering, Kendall's tau, sensitivity |
 | `demo.py` | the Amsterdam example, two refusals, the toy geometry, and the ranking |
 | `examples/amsterdam_noise.py` | offline execution and reference checks on the RIVM raster extract |
+| `typed_workflow_layer/gis_backend.py` | optional fractional raster coverage over polygon zones |
+| `examples/amsterdam_polygons.py` | CBS neighbourhoods checked against an independent GDAL reference |
 | `analysis.py` | soundness, growth, ablation, type closure, ranking discrimination |
 | `tests/` | regression, execution, provenance, evaluation and demo tests |
 

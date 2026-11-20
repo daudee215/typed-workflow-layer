@@ -1,0 +1,26 @@
+{
+  "threshold_db": 70,
+  "raster_sha256": "44eb4104d9cdeff55cabe59dcf2c5acb855e438ff02da00bbbc58c560179bc00",
+  "zones_sha256": "ae9b9e8f00cea88ee908f9186339666b286b44c249f2e75161f8e0ce5425ddba",
+  "method": "GDAL 3.13.2 zonal-stats, fractional pixels on a binary threshold raster",
+  "zones": [
+    {
+      "code": "BU03633900",
+      "fractional_cells_total": 1485.7592837925868,
+      "fractional_cells_qualified": 395.27104289151157,
+      "share": 0.26603975973990396
+    },
+    {
+      "code": "BU03634100",
+      "fractional_cells_total": 748.6343306425481,
+      "fractional_cells_qualified": 42.411011641379446,
+      "share": 0.056651171213292266
+    },
+    {
+      "code": "BU03630106",
+      "fractional_cells_total": 706.2177384757142,
+      "fractional_cells_qualified": 17.441724923904985,
+      "share": 0.024697375856843874
+    }
+  ]
+}

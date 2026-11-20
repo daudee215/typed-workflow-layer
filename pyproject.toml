@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "typed-workflow-layer"
-version = "0.1.0"
+version = "0.2.0"
 description = "A typed intermediate layer between a geo-analytical question and the workflows that answer it, with the type lattice held as an OWL ontology"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,6 +23,7 @@ dependencies = []
 # rdflib is absent, and a CI job installs it so the comparison cannot skip
 # there.
 check = ["rdflib>=6"]
+gis = ["numpy>=1.24,<3", "rasterio>=1.4,<2", "shapely>=2,<3"]
 
 [project.urls]
 Homepage = "https://github.com/daudee215/typed-workflow-layer"

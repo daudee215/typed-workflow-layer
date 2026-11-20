@@ -5,11 +5,11 @@
 - Maintain the offline RIVM case, the source and extract checksums, the independent pixel counts, and the type-valid failure case.
 - For corrections, record the changed input or assumption, regenerate the reference, and check the cited release remains reproducible from its tag.
 
-## v0.2 · Add a CRS-aware backend
+## v0.2 · CRS-aware backend (released)
 
-- Implement `Constrain`, `Coverage` and `Proportion` in one optional GIS backend using Rasterio for rasters and Shapely for polygon intersections. Start with the Amsterdam raster and a small set of real polygon boundaries.
-- Specify the CRS, how partially covered cells contribute to area, and the treatment of nodata. Fail explicitly when a transform or the area denominator is ambiguous.
-- Compare both backends on the aligned-window fixture. Compare polygon results with an independently computed reference that covers boundaries, holes and nodata. Keep the offline rectangle example in the test matrix.
+- The optional backend runs `Constrain`, `Coverage` and `Proportion` on north-up rasters and polygon boundaries in a shared projected metre CRS.
+- Fractional cell areas contribute to the whole-zone share. Missing raster support, mismatched CRS and ambiguous transforms raise errors.
+- CI checks parity on aligned windows, boundary and hole geometry, nodata, and three CBS neighbourhood results against a GDAL reference. The offline example remains in the test matrix.
 
 ## v0.3 · Evaluate answers and ranking
 
