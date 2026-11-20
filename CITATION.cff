@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software in your research, please cite it using this metadata."
+title: Typed Workflow Layer
+type: software
+authors:
+  - family-names: Tasleem
+    given-names: M. Daud
+version: "0.1.0"
+date-released: "2026-11-20"
+license: MIT
+repository-code: https://github.com/daudee215/typed-workflow-layer
+url: https://github.com/daudee215/typed-workflow-layer/releases/tag/v0.1.0

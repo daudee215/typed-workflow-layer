@@ -1,0 +1,34 @@
+{
+  "source": {
+    "provider": "RIVM / Atlas Leefomgeving",
+    "title": "Geluid van wegverkeer (Lden)",
+    "model_year": 2022,
+    "catalogue_url": "https://data.rivm.nl/meta/srv/api/records/f9a57393-176a-4eaf-9ce8-276f7a531a92",
+    "archive_url": "https://data.rivm.nl/data/alo/rivm_20250101_Geluid_lden_wegverkeer_2022.zip",
+    "archive_sha256": "08970ba561c90ac93de8408b09328af2ace6198e113bbb2ab39f89ba4e157f69",
+    "raster_member": "rivm_20250101_Geluid_lden_wegverkeer_2022.tif",
+    "rights_url": "https://creativecommons.org/publicdomain/mark/1.0/"
+  },
+  "grid_sha256": "264b5706e74d0d709c0e5af7d346bb871dcab88bac25cd9ae09cf2fc8ece6466",
+  "threshold_db": 70,
+  "zones": [
+    {
+      "id": "west",
+      "total_pixels": 900,
+      "above_threshold_pixels": 425,
+      "share": 0.4722222222222222
+    },
+    {
+      "id": "central",
+      "total_pixels": 900,
+      "above_threshold_pixels": 0,
+      "share": 0.0
+    },
+    {
+      "id": "south",
+      "total_pixels": 900,
+      "above_threshold_pixels": 611,
+      "share": 0.6788888888888889
+    }
+  ]
+}

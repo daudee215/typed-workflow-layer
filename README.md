@@ -12,7 +12,41 @@ typed sources this package consumes; the answers this package's workflows produc
 put in front of people and scored in
 [geoqa-study-harness](https://github.com/daudee215/geoqa-study-harness).
 
-Python 3.10, standard library only. No numpy, no geopandas, no external packages.
+Python 3.10 or later. The core and the worked examples use the standard library.
+
+## Amsterdam road-noise example
+
+*What share of each selected Amsterdam window is mapped in an Lden road-noise
+class of 70 dB or higher?* Run this from the repository root:
+
+```bash
+python -m examples.amsterdam_noise
+```
+
+The example runs offline on a frozen extract of RIVM's 2022 modelled road-noise
+raster. The reference counts qualifying 10 m raster cells directly. The
+workflow measures their area using `Constrain → Coverage → Proportion`. A second
+workflow omits `Constrain`, produces the same declared output type, and returns
+the share covered by the input raster. The reference catches the difference.
+
+| Window | Pixels at or above 70 dB | Reference and thresholded workflow | Unfiltered workflow |
+| --- | ---: | ---: | ---: |
+| West | 425 / 900 | 47.22% | 100% |
+| Central | 0 / 900 | 0.00% | 100% |
+| South | 611 / 900 | 67.89% | 100% |
+
+Both workflows execute. The thresholded workflow matches all three reference
+values, and the unfiltered workflow fails all three comparisons.
+`python -m examples.amsterdam_noise --json` prints the checks and execution
+traces.
+
+The windows are three 300 m squares chosen to illustrate different levels of
+coverage. Their results describe mapped road-noise classes within those squares.
+See the [input provenance and regeneration guide](examples/data/amsterdam_noise/README.md),
+[reference counts](examples/data/amsterdam_noise/reference.json), and
+[citation metadata](CITATION.cff).
+
+## Core implementation
 
 The repository now contains a complete, reproducible vertical slice: a typed
 workflow can be bound to runtime values, executed by a rectangle backend,
@@ -43,9 +77,8 @@ type, the package enumerates every workflow that reaches the target within a dep
 bound, refuses the ones that do not type check, explains each refusal, and emits a
 self-describing conceptual transformation graph for each workflow it does return.
 
-The worked example is the proportion of area covered
-by at least 70 dB of noise for each district in Amsterdam, from a noise contour map
-and a set of district boundaries.
+The original `demo.py` uses synthetic rectangles to demonstrate the question
+of how much of each district is covered by noise of at least 70 dB.
 
 The single idea worth taking away is in `Coverage`. Measuring how much of a field falls
 inside an object moves the value from the field to the object and makes it an extensive
@@ -295,12 +328,9 @@ than one of them.
 
 Read this section before the code.
 
-- **Toy geometry.** Axis aligned integer rectangles, with validated bounds and
-  intersection arithmetic. No CRS, projection, topology, or polygon validity
-  checking is provided.
-- **Toy execution only.** `executor.py` runs the bundled rectangle backend but
-  not shapefiles, databases, or real Amsterdam data. Real geodata adapters and
-  backend-parity tests remain future work.
+- **Geometry and CRS.** The bundled backend uses pre-aligned, axis-aligned
+  rectangles. The RIVM example binds native grid cells in a single projected CRS.
+  Polygon geometry, reprojection and mixed-CRS input are future backend work.
 - **A tiny catalogue.** Ten transformations. The CCD work covers a far larger operation
   set, and several signatures here would be argued over.
 - **Small question surface.** Three controlled phrasings plus a few explicit
@@ -322,27 +352,14 @@ Read this section before the code.
   topology constraints, still need a richer constraint language.
 - **No treatment of Network or Event.** Both terms exist on the concept axis and no
   transformation in the catalogue uses either.
-- **Type validity is not correctness.** `evaluation.py` makes the distinction
-  testable, but the bundled reference is synthetic. A PhD evaluation needs
-  real datasets, gold outputs, perturbation tests, and analyst review.
+- **Reference coverage.** `evaluation.py` checks the synthetic demo and the
+  three RIVM windows. A broader evaluation needs independent reference outputs
+  across questions, perturbation tests, and analyst review.
 
-## What I would build next, in order
+## Next versions
 
-1. Bind the backend contract to real operations, one GDAL, QGIS, PostGIS or GeoPandas
-   implementation per transformation, and compare outputs with hand-written references.
-2. Run a reasoner over the ontology rather than only reading its asserted axioms. The
-   hierarchy is already OWL and rdflib agrees with the reader triple for triple, so the
-   remaining step is entailment: materialise the closure with owlrl, and replace the
-   handwritten axis chains with the published CCD ontology, keeping this one as a fast
-   pre-filter.
-3. Collect a preference ordering from two or three analysts over the 24, and run
-   `ranking.agreement` against it. If tau is low, `ranking.disagreements` names the pairs
-   to argue about, and each one is either a counterexample or a missing term in the cost
-   model. This is the piece that turns the ranking from defensible into validated.
-4. Expand the question interface while keeping the typed request as the only boundary
-   into synthesis; unsupported or ambiguous questions should be refused explicitly.
-5. Add benchmark datasets, execution timing, error propagation, and ablations so the
-   system can be evaluated on semantic validity, numerical correctness, and robustness.
+The [roadmap](ROADMAP.md) sets out the CRS-aware backend, a benchmark for
+answers and ranking, and later work on the question interface and OWL entailment.
 
 ## Files
 
@@ -360,6 +377,7 @@ Read this section before the code.
 | `cost.py` | scale, support, concept, length, source and redundancy cost, position weighted |
 | `ranking.py` | ordering, pairwise explanation, plan rendering, Kendall's tau, sensitivity |
 | `demo.py` | the Amsterdam example, two refusals, the toy geometry, and the ranking |
+| `examples/amsterdam_noise.py` | offline execution and reference checks on the RIVM raster extract |
 | `analysis.py` | soundness, growth, ablation, type closure, ranking discrimination |
 | `tests/` | regression, execution, provenance, evaluation and demo tests |
 
