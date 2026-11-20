@@ -83,6 +83,10 @@ jobs:
         run: python -m unittest tests.test_gis_backend -v
       - name: Run the published polygon example
         run: python -m examples.amsterdam_polygons
+      - name: Check the benchmark and ranking import
+        run: python -m unittest tests.test_workflow_benchmark -v
+      - name: Print the published scorecard
+        run: python -m examples.workflow_benchmark
 
   wheel:
     name: installed wheel

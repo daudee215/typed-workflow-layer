@@ -29,13 +29,15 @@ UNFILTERED = (
 )
 
 
-def run_example() -> dict:
-    """Compare the requested noise share and the type-valid unfiltered share."""
+def load_inputs() -> tuple[dict, dict]:
     reference = json.loads((DATA / "reference.json").read_text(encoding="utf-8"))
     raw_grid = (DATA / "grid.json").read_bytes()
     if hashlib.sha256(raw_grid).hexdigest() != reference["grid_sha256"]:
         raise ValueError("The frozen RIVM grid differs from the reference snapshot.")
-    grid = json.loads(raw_grid)
+    return json.loads(raw_grid), reference
+
+
+def bind_grid(grid: dict) -> dict:
     size = grid["pixel_size_m"]
     fields = []
     zones = []
@@ -48,10 +50,16 @@ def run_example() -> dict:
                 west = left + column * size
                 fields.append(FieldRecord((west, north - size, west + size, north), value))
 
-    runtime = {
+    return {
         "noise": RuntimeDataset("noise", SOURCES[0].type, tuple(fields)),
         "zone": RuntimeDataset("zone", SOURCES[1].type, tuple(zones)),
     }
+
+
+def run_example() -> dict:
+    """Compare the requested noise share and the type-valid unfiltered share."""
+    grid, reference = load_inputs()
+    runtime = bind_grid(grid)
     threshold = reference["threshold_db"]
     intended = build_chain(THRESHOLDED, SOURCES)
     alternative = build_chain(UNFILTERED, SOURCES)
@@ -76,7 +84,7 @@ def run_example() -> dict:
         "source": reference["source"],
         "grid_sha256": reference["grid_sha256"],
         "crs": grid["crs"],
-        "pixel_size_m": size,
+        "pixel_size_m": grid["pixel_size_m"],
         "threshold_db": threshold,
         "reference": reference["zones"],
         "results": results,

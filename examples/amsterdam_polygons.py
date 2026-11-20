@@ -16,7 +16,7 @@ from typed_workflow_layer.gis_backend import PolygonZones, RasterField, RasterPo
 DATA = Path(__file__).resolve().parent / "data" / "amsterdam_polygons"
 
 
-def run_example():
+def load_inputs():
     reference = json.loads((DATA / "reference.json").read_bytes())
     for filename, key in (("noise.tif", "raster_sha256"), ("zones.geojson", "zones_sha256")):
         if hashlib.sha256((DATA / filename).read_bytes()).hexdigest() != reference[key]:
@@ -31,6 +31,11 @@ def run_example():
         for feature in collection["features"]
     ), collection["crs"]["properties"]["name"])
     raster = RasterField.from_geotiff(DATA / "noise.tif")
+    return raster, zones, names, reference
+
+
+def run_example():
+    raster, zones, names, reference = load_inputs()
     result = execute(
         build_chain(THRESHOLDED, SOURCES),
         (RuntimeDataset("noise", SOURCES[0].type, raster),

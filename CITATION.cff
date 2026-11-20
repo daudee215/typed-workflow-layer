@@ -5,8 +5,8 @@ type: software
 authors:
   - family-names: Tasleem
     given-names: M. Daud
-version: "0.2.0"
+version: "0.3.0"
 date-released: "2026-11-20"
 license: MIT
 repository-code: https://github.com/daudee215/typed-workflow-layer
-url: https://github.com/daudee215/typed-workflow-layer/releases/tag/v0.2.0
+url: https://github.com/daudee215/typed-workflow-layer/releases/tag/v0.3.0

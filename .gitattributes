@@ -1,3 +1,4 @@
 /examples/data/amsterdam_noise/*.json text eol=lf
 /examples/data/amsterdam_polygons/*.geojson text eol=lf
 /examples/data/amsterdam_polygons/*.tif binary
+/examples/data/workflow_benchmark/*.json text eol=lf

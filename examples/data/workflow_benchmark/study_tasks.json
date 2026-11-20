@@ -1,0 +1,15 @@
+{
+  "name": "Workflow benchmark 40fffa8ab5dded36dce10a2703c98217f3fc5848e485f1737c9748be5cbb95ae",
+  "tasks": [
+    {
+      "task_id": "amsterdam-70",
+      "kind": "open",
+      "question": "What share of each Amsterdam analysis window is in a mapped road-noise class of at least 70 dB Lden?\n\nRank these workflows for the question as written.\nA. Proportion(Coverage(Constrain(noise), zone))  [Constrain: >= 70 dB]\nB. Proportion(Coverage(noise, zone))\nC. Proportion(Coverage(Constrain(Clip(noise, zone)), zone))  [Constrain: >= 70 dB]\nD. Proportion(Coverage(Constrain(noise), zone))  [Constrain: >= 75 dB]\n\nEnter JSON rank groups, best first. For example [[\"W\"], [\"X\", \"Y\"], [\"Z\"]].\nPut tied candidates in the same group and use each label exactly once."
+    },
+    {
+      "task_id": "inclusive-boundary",
+      "kind": "open",
+      "question": "What share of the three-cell synthetic strip is at least 70 dB? The equal-area cells read 70, 75 and 60 dB.\n\nRank these workflows for the question as written.\nA. Proportion(Coverage(Constrain(noise), zone))  [Constrain: > 70 dB]\nB. Proportion(Coverage(noise, zone))\nC. Proportion(Coverage(Constrain(noise), zone))  [Constrain: >= 70 dB]\nD. Proportion(Coverage(Constrain(Clip(noise, zone)), zone))  [Constrain: >= 70 dB]\n\nEnter JSON rank groups, best first. For example [[\"W\"], [\"X\", \"Y\"], [\"Z\"]].\nPut tied candidates in the same group and use each label exactly once."
+    }
+  ]
+}

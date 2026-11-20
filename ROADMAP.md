@@ -13,9 +13,8 @@
 
 ## v0.3 · Evaluate answers and ranking
 
-- Publish a small set of benchmark questions with pinned inputs and independent reference outputs. Include wrong-threshold, wrong-support and missing-denominator cases.
-- Report type admissibility, numerical correctness, and execution time separately. Track how often an admissible workflow gives the wrong answer.
-- Use [GeoQA Study Harness](https://github.com/daudee215/geoqa-study-harness) to ask analysts to rank a shared set of candidate workflows. Report inter-analyst agreement, Kendall's tau between the cost model and analyst orderings, and the pairs that disagree. Use the disagreements to design the next ranking changes.
+- Released a [ten-question benchmark and scorecard](examples/data/workflow_benchmark/README.md) with pinned inputs and independent references. The runner reports type admissibility, numerical matches, refusals and optional execution times.
+- The blinded task file and tie-aware comparison are ready for [GeoQA Study Harness](https://github.com/daudee215/geoqa-study-harness). Analyst agreement awaits collected rankings. Review the reported disagreements before revisiting model weights.
 
 ## v0.4 · Expand the question and ontology interfaces
 

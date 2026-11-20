@@ -1,0 +1,531 @@
+{
+  "version": "0.3.0",
+  "snapshots": {
+    "amsterdam_noise/grid.json": "264b5706e74d0d709c0e5af7d346bb871dcab88bac25cd9ae09cf2fc8ece6466",
+    "amsterdam_polygons/noise.tif": "44eb4104d9cdeff55cabe59dcf2c5acb855e438ff02da00bbbc58c560179bc00",
+    "amsterdam_polygons/zones.geojson": "ae9b9e8f00cea88ee908f9186339666b286b44c249f2e75161f8e0ce5425ddba"
+  },
+  "synthetic": {
+    "strip": {
+      "backend": "rectangle",
+      "fields": [
+        [
+          [
+            0,
+            0,
+            10,
+            10
+          ],
+          70
+        ],
+        [
+          [
+            10,
+            0,
+            20,
+            10
+          ],
+          75
+        ],
+        [
+          [
+            20,
+            0,
+            30,
+            10
+          ],
+          60
+        ]
+      ],
+      "zones": [
+        [
+          "strip",
+          [
+            0,
+            0,
+            30,
+            10
+          ]
+        ]
+      ]
+    },
+    "hole": {
+      "backend": "gis",
+      "values": [
+        [
+          70,
+          40
+        ],
+        [
+          50,
+          90
+        ]
+      ],
+      "origin": [
+        0,
+        2
+      ],
+      "crs": "EPSG:28992",
+      "zones": [
+        [
+          "hole",
+          {
+            "shell": [
+              [
+                0.5,
+                0
+              ],
+              [
+                2,
+                0
+              ],
+              [
+                2,
+                2
+              ],
+              [
+                0.5,
+                2
+              ],
+              [
+                0.5,
+                0
+              ]
+            ],
+            "holes": [
+              [
+                [
+                  1.25,
+                  1.25
+                ],
+                [
+                  1.75,
+                  1.25
+                ],
+                [
+                  1.75,
+                  1.75
+                ],
+                [
+                  1.25,
+                  1.75
+                ],
+                [
+                  1.25,
+                  1.25
+                ]
+              ]
+            ]
+          }
+        ]
+      ]
+    },
+    "missing": {
+      "backend": "gis",
+      "values": [
+        [
+          80,
+          null
+        ]
+      ],
+      "origin": [
+        0,
+        1
+      ],
+      "crs": "EPSG:28992",
+      "zones": [
+        [
+          "whole",
+          {
+            "shell": [
+              [
+                0,
+                0
+              ],
+              [
+                2,
+                0
+              ],
+              [
+                2,
+                1
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ]
+      ]
+    },
+    "mixed-crs": {
+      "backend": "gis",
+      "values": [
+        [
+          80,
+          40
+        ]
+      ],
+      "origin": [
+        0,
+        1
+      ],
+      "crs": "EPSG:28992",
+      "zone_crs": "EPSG:32631",
+      "zones": [
+        [
+          "whole",
+          {
+            "shell": [
+              [
+                0,
+                0
+              ],
+              [
+                2,
+                0
+              ],
+              [
+                2,
+                1
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  "questions": [
+    {
+      "id": "amsterdam-70",
+      "question": "What share of each Amsterdam analysis window is in a mapped road-noise class of at least 70 dB Lden?",
+      "fixture": "rivm-grid",
+      "reference": {
+        "method": "Count the native 10 m cells in class 70 or above, then divide by 900.",
+        "values": {
+          "west": 0.4722222222222222,
+          "central": 0,
+          "south": 0.6788888888888889
+        }
+      },
+      "candidates": [
+        {
+          "id": "A",
+          "chain": "share",
+          "expect": "match",
+          "predicate": {
+            "operator": ">=",
+            "value": 70
+          }
+        },
+        {
+          "id": "B",
+          "chain": "unfiltered",
+          "expect": "wrong"
+        },
+        {
+          "id": "C",
+          "chain": "clipped-share",
+          "expect": "match",
+          "predicate": {
+            "operator": ">=",
+            "value": 70
+          }
+        },
+        {
+          "id": "D",
+          "chain": "share",
+          "expect": "wrong",
+          "predicate": {
+            "operator": ">=",
+            "value": 75
+          }
+        }
+      ],
+      "study": true
+    },
+    {
+      "id": "amsterdam-75",
+      "question": "What share of each Amsterdam analysis window is in a mapped road-noise class of at least 75 dB Lden?",
+      "fixture": "rivm-grid",
+      "reference": {
+        "method": "Direct raster-cell counts of 185, 0 and 263, divided by 900.",
+        "values": {
+          "west": 0.20555555555555555,
+          "central": 0,
+          "south": 0.2922222222222222
+        }
+      },
+      "candidates": [
+        {
+          "id": "A",
+          "chain": "share",
+          "expect": "match",
+          "predicate": {
+            "operator": ">=",
+            "value": 75
+          }
+        },
+        {
+          "id": "B",
+          "chain": "share",
+          "expect": "wrong",
+          "predicate": {
+            "operator": ">=",
+            "value": 70
+          }
+        }
+      ]
+    },
+    {
+      "id": "amsterdam-below-70",
+      "question": "What share of each Amsterdam analysis window is in a mapped road-noise class below 70 dB Lden?",
+      "fixture": "rivm-grid",
+      "reference": {
+        "method": "Direct raster-cell counts of 475, 900 and 289, divided by 900.",
+        "values": {
+          "west": 0.5277777777777778,
+          "central": 1,
+          "south": 0.3211111111111111
+        }
+      },
+      "candidates": [
+        {
+          "id": "A",
+          "chain": "share",
+          "expect": "wrong",
+          "predicate": {
+            "operator": ">=",
+            "value": 70
+          }
+        },
+        {
+          "id": "B",
+          "chain": "share",
+          "expect": "match",
+          "predicate": {
+            "operator": "<",
+            "value": 70
+          }
+        }
+      ]
+    },
+    {
+      "id": "neighbourhood-70",
+      "question": "What share of each of the three CBS neighbourhoods is in a mapped road-noise class of at least 70 dB Lden?",
+      "fixture": "cbs-polygons",
+      "reference": {
+        "method": "GDAL 3.13.2 fractional zonal means on the binary threshold raster.",
+        "values": {
+          "BU03633900": 0.26603975973990396,
+          "BU03634100": 0.056651171213292266,
+          "BU03630106": 0.024697375856843874
+        }
+      },
+      "candidates": [
+        {
+          "id": "A",
+          "chain": "share",
+          "expect": "match",
+          "predicate": {
+            "operator": ">=",
+            "value": 70
+          }
+        },
+        {
+          "id": "B",
+          "chain": "unfiltered",
+          "expect": "wrong"
+        }
+      ]
+    },
+    {
+      "id": "inclusive-boundary",
+      "question": "What share of the three-cell synthetic strip is at least 70 dB? The equal-area cells read 70, 75 and 60 dB.",
+      "fixture": "strip",
+      "reference": {
+        "method": "Two of the three 100 m² cells meet the inclusive threshold.",
+        "values": {
+          "strip": 0.6666666666666666
+        }
+      },
+      "candidates": [
+        {
+          "id": "A",
+          "chain": "share",
+          "expect": "wrong",
+          "predicate": {
+            "operator": ">",
+            "value": 70
+          }
+        },
+        {
+          "id": "B",
+          "chain": "unfiltered",
+          "expect": "wrong"
+        },
+        {
+          "id": "C",
+          "chain": "share",
+          "expect": "match",
+          "predicate": {
+            "operator": ">=",
+            "value": 70
+          }
+        },
+        {
+          "id": "D",
+          "chain": "clipped-share",
+          "expect": "match",
+          "predicate": {
+            "operator": ">=",
+            "value": 70
+          }
+        }
+      ],
+      "study": true
+    },
+    {
+      "id": "absolute-area",
+      "question": "How many square metres in the three-cell synthetic strip are at least 70 dB?",
+      "fixture": "strip",
+      "reference": {
+        "method": "Two qualifying 100 m² cells give an area of 200 m².",
+        "values": {
+          "strip": 200
+        }
+      },
+      "candidates": [
+        {
+          "id": "A",
+          "chain": "area",
+          "expect": "match",
+          "predicate": {
+            "operator": ">=",
+            "value": 70
+          }
+        },
+        {
+          "id": "B",
+          "chain": "share",
+          "expect": "type_refusal",
+          "predicate": {
+            "operator": ">=",
+            "value": 70
+          },
+          "refusal": {
+            "stage": "type",
+            "reason": "requested result type"
+          }
+        }
+      ],
+      "target": "area"
+    },
+    {
+      "id": "fractional-hole",
+      "question": "What share of the synthetic polygon with a hole is at least 70 dB, using fractional cell areas?",
+      "fixture": "hole",
+      "reference": {
+        "method": "Qualifying cells contribute 0.5 + 1 m². The outer area is 3 m² and the hole removes 0.25 m².",
+        "values": {
+          "hole": 0.5454545454545454
+        }
+      },
+      "candidates": [
+        {
+          "id": "A",
+          "chain": "share",
+          "expect": "match",
+          "predicate": {
+            "operator": ">=",
+            "value": 70
+          }
+        },
+        {
+          "id": "B",
+          "chain": "unfiltered",
+          "expect": "wrong"
+        }
+      ]
+    },
+    {
+      "id": "region-as-points",
+      "question": "Can this interpolation workflow estimate a continuous field when the supplied noise data are already regional cells?",
+      "fixture": "strip",
+      "target": "field",
+      "reference": {
+        "method": "The interpolation signature requires points and the fixture has regional cells.",
+        "refusal": {
+          "stage": "type",
+          "reason": "PointSupport"
+        }
+      },
+      "candidates": [
+        {
+          "id": "A",
+          "chain": "interpolate",
+          "expect": "type_refusal"
+        }
+      ]
+    },
+    {
+      "id": "missing-valid-area",
+      "question": "What share of the whole two-cell zone is at least 70 dB when one of its cells is missing?",
+      "fixture": "missing",
+      "reference": {
+        "method": "Valid data cover half the zone. The whole-zone share is undefined.",
+        "refusal": {
+          "stage": "execution",
+          "reason": "whole-zone share is undefined"
+        }
+      },
+      "candidates": [
+        {
+          "id": "A",
+          "chain": "share",
+          "expect": "execution_refusal",
+          "predicate": {
+            "operator": ">=",
+            "value": 70
+          }
+        }
+      ]
+    },
+    {
+      "id": "mismatched-crs",
+      "question": "Can the polygon workflow evaluate the whole-zone share when the raster and zone are supplied in different projected CRSs?",
+      "fixture": "mixed-crs",
+      "reference": {
+        "method": "The raster is in EPSG:28992 and the zone uses EPSG:32631. No shared area support has been established.",
+        "refusal": {
+          "stage": "execution",
+          "reason": "same projected CRS"
+        }
+      },
+      "candidates": [
+        {
+          "id": "A",
+          "chain": "share",
+          "expect": "execution_refusal",
+          "predicate": {
+            "operator": ">=",
+            "value": 70
+          }
+        }
+      ]
+    }
+  ]
+}

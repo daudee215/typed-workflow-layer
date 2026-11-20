@@ -68,6 +68,22 @@ the shared projected CRS. If nodata or the raster boundary leaves a measurable
 area uncovered, it raises an error. The three results match an independently
 computed GDAL fractional-pixel reference. [Inputs, attribution and reference method](examples/data/amsterdam_polygons/README.md)
 
+## Workflow benchmark
+
+Version 0.3 evaluates **10 questions and 21 fixed workflow candidates**. It
+checks wrong thresholds, missing filters, invalid spatial support, and missing
+raster coverage against independent numerical references and expected refusals.
+
+```bash
+python -m pip install ".[gis]"
+python -m examples.workflow_benchmark
+```
+
+Of 19 type-admitted candidates, eight return deliberately wrong answers in
+the benchmark. All three requested refusals matched their expected stage and
+reason. The [scorecard and study protocol](examples/data/workflow_benchmark/README.md)
+explain the denominators and link to the blinded analyst task file.
+
 ## Core implementation
 
 The repository now contains a complete, reproducible vertical slice: a typed
@@ -380,9 +396,9 @@ Read this section before the code.
 
 ## Next versions
 
-The [roadmap](ROADMAP.md) records the GIS backend release and plans the next
-benchmark for answers and ranking, followed by work on the question interface
-and OWL entailment.
+The [roadmap](ROADMAP.md) records the GIS backend and benchmark releases.
+Analyst rankings are the remaining evaluation step before expanding the
+question interface and checking OWL entailment.
 
 ## Files
 
@@ -403,6 +419,8 @@ and OWL entailment.
 | `examples/amsterdam_noise.py` | offline execution and reference checks on the RIVM raster extract |
 | `typed_workflow_layer/gis_backend.py` | optional fractional raster coverage over polygon zones |
 | `examples/amsterdam_polygons.py` | CBS neighbourhoods checked against an independent GDAL reference |
+| `examples/workflow_benchmark.py` | fixed candidate scorecard with numerical comparisons and refusal diagnostics |
+| `examples/benchmark_study.py` | blinded analyst tasks and tie-aware comparisons of exported rankings |
 | `analysis.py` | soundness, growth, ablation, type closure, ranking discrimination |
 | `tests/` | regression, execution, provenance, evaluation and demo tests |
 
